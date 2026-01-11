@@ -1,0 +1,278 @@
+✓ Initialized. View run at 
+https://modal.com/apps/whenthedarknightrises/main/ap-5HJH8wiTudOc4X2ybUzu0V
+✓ Created objects.
+├── 🔨 Created mount /content/train_jigsaw_model.py
+└── 🔨 Created function train.
+🚀 Starting Jigsaw GNN training on Modal...
+DGL backend not selected or invalid.  Assuming PyTorch for now.
+Setting the default backend to "pytorch". You can change it in the ~/.dgl/config.json file or export the DGLBACKEND environment variable.  Valid options are: pytorch, mxnet, tensorflow (all lowercase)
+[REMOTE INFO] Loading ogbn-arxiv dataset using OGB...
+Downloading http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip
+
+[1A  0%|          | 0/81 [00:00<?, ?it/s]Downloaded 0.00 GB:   0%|          | 0/81 [00:00<?, ?it/s]
+[1ADownloaded 0.00 GB:   1%|          | 1/81 [00:00<00:25,  3.12it/s]Downloaded 0.00 GB:   1%|          | 1/81 [00:00<00:25,  3.12it/s]
+[1ADownloaded 0.00 GB:   2%|▏         | 2/81 [00:00<00:15,  5.15it/s]
+[1ADownloaded 0.00 GB:   2%|▏         | 2/81 [00:00<00:15,  5.15it/s]
+[1ADownloaded 0.00 GB:   2%|▏         | 2/81 [00:00<00:15,  5.15it/s]Downloaded 0.00 GB:   2%|▏         | 2/81 [00:00<00:15,  5.15it/s]
+[1ADownloaded 0.00 GB:   6%|▌         | 5/81 [00:00<00:06, 12.20it/s]
+[1ADownloaded 0.01 GB:   6%|▌         | 5/81 [00:00<00:06, 12.20it/s]
+[1ADownloaded 0.01 GB:   6%|▌         | 5/81 [00:00<00:06, 12.20it/s]
+[1ADownloaded 0.01 GB:   6%|▌         | 5/81 [00:00<00:06, 12.20it/s]
+[1ADownloaded 0.01 GB:   6%|▌         | 5/81 [00:00<00:06, 12.20it/s]Downloaded 0.01 GB:   6%|▌         | 5/81 [00:00<00:06, 12.20it/s]
+[1ADownloaded 0.01 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.01 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.01 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.01 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.01 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.01 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.02 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.02 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]Downloaded 0.02 GB:  12%|█▏        | 10/81 [00:00<00:03, 23.06it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.03 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]Downloaded 0.03 GB:  22%|██▏       | 18/81 [00:00<00:01, 38.63it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.04 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]Downloaded 0.04 GB:  33%|███▎      | 27/81 [00:00<00:01, 52.93it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:00<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:00<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:00<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:00<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:01<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:01<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:01<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:01<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:01<00:00, 64.43it/s]Downloaded 0.04 GB:  46%|████▌     | 37/81 [00:01<00:00, 64.43it/s]
+[1ADownloaded 0.04 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]Downloaded 0.05 GB:  57%|█████▋    | 46/81 [00:01<00:00, 70.51it/s]
+[1ADownloaded 0.05 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]Downloaded 0.06 GB:  69%|██████▉   | 56/81 [00:01<00:00, 76.44it/s]
+[1ADownloaded 0.06 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]Downloaded 0.07 GB:  81%|████████▏ | 66/81 [00:01<00:00, 80.07it/s]
+[1ADownloaded 0.07 GB:  94%|█████████▍| 76/81 [00:01<00:00, 83.24it/s]
+[1ADownloaded 0.08 GB:  94%|█████████▍| 76/81 [00:01<00:00, 83.24it/s]
+[1ADownloaded 0.08 GB:  94%|█████████▍| 76/81 [00:01<00:00, 83.24it/s]Downloaded 0.08 GB:  94%|█████████▍| 76/81 [00:01<00:00, 83.24it/s]Downloaded 0.08 GB:  94%|█████████▍| 76/81 [00:01<00:00, 83.24it/s]Downloaded 0.08 GB:  94%|█████████▍| 76/81 [00:01<00:00, 83.24it/s]Downloaded 0.08 GB: 100%|██████████| 81/81 [00:01<00:00, 56.15it/s]
+Extracting /tmp/ogbn_arxiv_data/arxiv.zip
+Processing...
+Loading necessary files...
+This might take a while.
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:00<00:00, 24818.37it/s]
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:00<00:00, 6657.63it/s]
+Processing graphs...
+Converting graphs into PyG objects...
+Saving...
+Done!
+  - Dataset loaded directly in PyG format: Data(num_nodes=169343, edge_index=[2, 2315598], x=[169343, 128], node_year=[169343, 1], y=[169343, 1])
+  - Nodes: 169343, Edges: 2315598, Features: 128
+[REMOTE INFO] Using device: cuda
+/usr/local/lib/python3.11/site-packages/torch/optim/lr_scheduler.py:28: UserWarning: The verbose parameter is deprecated. Please use get_last_lr() to access the learning rate.
+  warnings.warn("The verbose parameter is deprecated. Please use get_last_lr() "
+[SETUP] Building 5 different hierarchies for Jigsaw training...
+
+  • Building hierarchy with 156 coarse and 1248 (target) fine partitions...
+    - Created 1248 usable fine partitions from 156 coarse partitions (Node counts: Min=1053, Max=1118, Avg=1085.53). Coarse connectivity graph has 8768 edges.
+
+  • Building hierarchy with 165 coarse and 1320 (target) fine partitions...
+    - Created 1320 usable fine partitions from 165 coarse partitions (Node counts: Min=996, Max=1057, Avg=1026.32). Coarse connectivity graph has 9659 edges.
+
+  • Building hierarchy with 170 coarse and 1360 (target) fine partitions...
+    - Created 1360 usable fine partitions from 170 coarse partitions (Node counts: Min=967, Max=1026, Avg=996.14). Coarse connectivity graph has 10383 edges.
+
+  • Building hierarchy with 143 coarse and 715 (target) fine partitions...
+    - Created 715 usable fine partitions from 143 coarse partitions (Node counts: Min=1149, Max=1219, Avg=1184.22). Coarse connectivity graph has 7705 edges.
+
+  • Building hierarchy with 196 coarse and 1176 (target) fine partitions...
+    - Created 1176 usable fine partitions from 196 coarse partitions (Node counts: Min=838, Max=889, Avg=863.99). Coarse connectivity graph has 12640 edges.
+--------------------------------------------------
+Epoch 1/150: Avg Loss = 1.522942, LR = 1.0e-04
+Epoch 2/150: Avg Loss = 0.816606, LR = 1.0e-04
+Epoch 3/150: Avg Loss = 0.675632, LR = 1.0e-04
+Epoch 4/150: Avg Loss = 0.610728, LR = 1.0e-04
+Epoch 5/150: Avg Loss = 0.568386, LR = 1.0e-04
+Epoch 6/150: Avg Loss = 0.532749, LR = 1.0e-04
+Epoch 7/150: Avg Loss = 0.498880, LR = 1.0e-04
+Epoch 8/150: Avg Loss = 0.487733, LR = 1.0e-04
+Epoch 9/150: Avg Loss = 0.467744, LR = 1.0e-04
+Epoch 10/150: Avg Loss = 0.459535, LR = 1.0e-04
+Epoch 11/150: Avg Loss = 0.425976, LR = 1.0e-04
+Epoch 12/150: Avg Loss = 0.416220, LR = 1.0e-04
+Epoch 13/150: Avg Loss = 0.427188, LR = 1.0e-04
+Epoch 14/150: Avg Loss = 0.406062, LR = 1.0e-04
+Epoch 15/150: Avg Loss = 0.394044, LR = 1.0e-04
+Epoch 16/150: Avg Loss = 0.378530, LR = 1.0e-04
+Epoch 17/150: Avg Loss = 0.374054, LR = 1.0e-04
+Epoch 18/150: Avg Loss = 0.356747, LR = 1.0e-04
+Epoch 19/150: Avg Loss = 0.341163, LR = 1.0e-04
+Epoch 20/150: Avg Loss = 0.373326, LR = 1.0e-04
+Epoch 21/150: Avg Loss = 0.337717, LR = 1.0e-04
+Epoch 22/150: Avg Loss = 0.329009, LR = 1.0e-04
+Epoch 23/150: Avg Loss = 0.335690, LR = 1.0e-04
+Epoch 24/150: Avg Loss = 0.329501, LR = 1.0e-04
+Epoch 25/150: Avg Loss = 0.318421, LR = 1.0e-04
+Epoch 26/150: Avg Loss = 0.325119, LR = 1.0e-04
+Epoch 27/150: Avg Loss = 0.305356, LR = 1.0e-04
+Epoch 28/150: Avg Loss = 0.314773, LR = 1.0e-04
+Epoch 29/150: Avg Loss = 0.299585, LR = 1.0e-04
+Epoch 30/150: Avg Loss = 0.295587, LR = 1.0e-04
+Epoch 31/150: Avg Loss = 0.300453, LR = 1.0e-04
+Epoch 32/150: Avg Loss = 0.288265, LR = 1.0e-04
+Epoch 33/150: Avg Loss = 0.281132, LR = 1.0e-04
+Epoch 34/150: Avg Loss = 0.279628, LR = 1.0e-04
+Epoch 35/150: Avg Loss = 0.277265, LR = 1.0e-04
+Epoch 36/150: Avg Loss = 0.279750, LR = 1.0e-04
+Epoch 37/150: Avg Loss = 0.281274, LR = 1.0e-04
+Epoch 38/150: Avg Loss = 0.264467, LR = 1.0e-04
+Epoch 39/150: Avg Loss = 0.268953, LR = 1.0e-04
+Epoch 40/150: Avg Loss = 0.270451, LR = 1.0e-04
+Epoch 41/150: Avg Loss = 0.261639, LR = 1.0e-04
+Epoch 42/150: Avg Loss = 0.257242, LR = 1.0e-04
+Epoch 43/150: Avg Loss = 0.261433, LR = 1.0e-04
+Epoch 44/150: Avg Loss = 0.253792, LR = 1.0e-04
+Epoch 45/150: Avg Loss = 0.238804, LR = 1.0e-04
+Epoch 46/150: Avg Loss = 0.233833, LR = 1.0e-04
+Epoch 47/150: Avg Loss = 0.255134, LR = 1.0e-04
+Epoch 48/150: Avg Loss = 0.243697, LR = 1.0e-04
+Epoch 49/150: Avg Loss = 0.248306, LR = 1.0e-04
+Epoch 50/150: Avg Loss = 0.224043, LR = 1.0e-04
+Epoch 51/150: Avg Loss = 0.229466, LR = 1.0e-04
+Epoch 52/150: Avg Loss = 0.251912, LR = 1.0e-04
+Epoch 53/150: Avg Loss = 0.239402, LR = 1.0e-04
+Epoch 54/150: Avg Loss = 0.238346, LR = 1.0e-04
+Epoch 55/150: Avg Loss = 0.242950, LR = 1.0e-04
+Epoch 56/150: Avg Loss = 0.220440, LR = 1.0e-04
+Epoch 57/150: Avg Loss = 0.231159, LR = 1.0e-04
+Epoch 58/150: Avg Loss = 0.220337, LR = 1.0e-04
+Epoch 59/150: Avg Loss = 0.215349, LR = 1.0e-04
+Epoch 60/150: Avg Loss = 0.218977, LR = 1.0e-04
+Epoch 61/150: Avg Loss = 0.218720, LR = 1.0e-04
+Epoch 62/150: Avg Loss = 0.226157, LR = 1.0e-04
+Epoch 63/150: Avg Loss = 0.212922, LR = 1.0e-04
+Epoch 64/150: Avg Loss = 0.218775, LR = 1.0e-04
+Epoch 65/150: Avg Loss = 0.214282, LR = 1.0e-04
+Epoch 66/150: Avg Loss = 0.217175, LR = 1.0e-04
+Epoch 67/150: Avg Loss = 0.219303, LR = 1.0e-04
+Epoch 68/150: Avg Loss = 0.205377, LR = 1.0e-04
+Epoch 69/150: Avg Loss = 0.203306, LR = 1.0e-04
+Epoch 70/150: Avg Loss = 0.207594, LR = 1.0e-04
+Epoch 71/150: Avg Loss = 0.204625, LR = 1.0e-04
+Epoch 72/150: Avg Loss = 0.197906, LR = 1.0e-04
+Epoch 73/150: Avg Loss = 0.215759, LR = 1.0e-04
+Epoch 74/150: Avg Loss = 0.209004, LR = 1.0e-04
+Epoch 75/150: Avg Loss = 0.200976, LR = 1.0e-04
+Epoch 76/150: Avg Loss = 0.196050, LR = 1.0e-04
+Epoch 77/150: Avg Loss = 0.196401, LR = 1.0e-04
+Epoch 78/150: Avg Loss = 0.209063, LR = 1.0e-04
+Epoch 79/150: Avg Loss = 0.194705, LR = 1.0e-04
+Epoch 80/150: Avg Loss = 0.195210, LR = 1.0e-04
+Epoch 81/150: Avg Loss = 0.192974, LR = 1.0e-04
+Epoch 82/150: Avg Loss = 0.189823, LR = 1.0e-04
+Epoch 83/150: Avg Loss = 0.192558, LR = 1.0e-04
+Epoch 84/150: Avg Loss = 0.185188, LR = 1.0e-04
+Epoch 85/150: Avg Loss = 0.195296, LR = 1.0e-04
+Epoch 86/150: Avg Loss = 0.186484, LR = 1.0e-04
+Epoch 87/150: Avg Loss = 0.190536, LR = 1.0e-04
+Epoch 88/150: Avg Loss = 0.185759, LR = 1.0e-04
+Epoch 89/150: Avg Loss = 0.198982, LR = 1.0e-04
+Epoch 90/150: Avg Loss = 0.175812, LR = 1.0e-04
+Epoch 91/150: Avg Loss = 0.177659, LR = 1.0e-04
+Epoch 92/150: Avg Loss = 0.191363, LR = 1.0e-04
+Epoch 93/150: Avg Loss = 0.167304, LR = 1.0e-04
+Epoch 94/150: Avg Loss = 0.179208, LR = 1.0e-04
+Epoch 95/150: Avg Loss = 0.192918, LR = 1.0e-04
+Epoch 96/150: Avg Loss = 0.187441, LR = 1.0e-04
+Epoch 97/150: Avg Loss = 0.178748, LR = 1.0e-04
+Epoch 98/150: Avg Loss = 0.186745, LR = 1.0e-04
+Epoch 99/150: Avg Loss = 0.177625, LR = 1.0e-04
+Epoch 100/150: Avg Loss = 0.181829, LR = 1.0e-04
+Epoch 101/150: Avg Loss = 0.180789, LR = 1.0e-04
+Epoch 102/150: Avg Loss = 0.173739, LR = 1.0e-04
+Epoch 103/150: Avg Loss = 0.183815, LR = 1.0e-04
+Epoch 104/150: Avg Loss = 0.177300, LR = 5.0e-05
+Epoch 105/150: Avg Loss = 0.167593, LR = 5.0e-05
+Epoch 106/150: Avg Loss = 0.170006, LR = 5.0e-05
+Epoch 107/150: Avg Loss = 0.161857, LR = 5.0e-05
+Epoch 108/150: Avg Loss = 0.164159, LR = 5.0e-05
+Epoch 109/150: Avg Loss = 0.151650, LR = 5.0e-05
+Epoch 110/150: Avg Loss = 0.163198, LR = 5.0e-05
+Epoch 111/150: Avg Loss = 0.159408, LR = 5.0e-05
+Epoch 112/150: Avg Loss = 0.157683, LR = 5.0e-05
+Epoch 113/150: Avg Loss = 0.170254, LR = 5.0e-05
+Epoch 114/150: Avg Loss = 0.163413, LR = 5.0e-05
+Epoch 115/150: Avg Loss = 0.161975, LR = 5.0e-05
+Epoch 116/150: Avg Loss = 0.165522, LR = 5.0e-05
+Epoch 117/150: Avg Loss = 0.158605, LR = 5.0e-05
+Epoch 118/150: Avg Loss = 0.154599, LR = 5.0e-05
+Epoch 119/150: Avg Loss = 0.153002, LR = 5.0e-05
+Epoch 120/150: Avg Loss = 0.171131, LR = 2.5e-05
+Epoch 121/150: Avg Loss = 0.157603, LR = 2.5e-05
+Epoch 122/150: Avg Loss = 0.158929, LR = 2.5e-05
+Epoch 123/150: Avg Loss = 0.142754, LR = 2.5e-05
+Epoch 124/150: Avg Loss = 0.150299, LR = 2.5e-05
+Epoch 125/150: Avg Loss = 0.155475, LR = 2.5e-05
+Epoch 126/150: Avg Loss = 0.157303, LR = 2.5e-05
+Epoch 127/150: Avg Loss = 0.153326, LR = 2.5e-05
+Epoch 128/150: Avg Loss = 0.152987, LR = 2.5e-05
+Epoch 129/150: Avg Loss = 0.148137, LR = 2.5e-05
+Epoch 130/150: Avg Loss = 0.150294, LR = 2.5e-05
+Epoch 131/150: Avg Loss = 0.144738, LR = 2.5e-05
+Epoch 132/150: Avg Loss = 0.162434, LR = 2.5e-05
+Epoch 133/150: Avg Loss = 0.148852, LR = 2.5e-05
+Epoch 134/150: Avg Loss = 0.163686, LR = 1.3e-05
+Epoch 135/150: Avg Loss = 0.141234, LR = 1.3e-05
+Epoch 136/150: Avg Loss = 0.154026, LR = 1.3e-05
+Epoch 137/150: Avg Loss = 0.156050, LR = 1.3e-05
+Epoch 138/150: Avg Loss = 0.158120, LR = 1.3e-05
+Epoch 139/150: Avg Loss = 0.160061, LR = 1.3e-05
+Epoch 140/150: Avg Loss = 0.142492, LR = 1.3e-05
+Epoch 141/150: Avg Loss = 0.145801, LR = 1.3e-05
+Epoch 142/150: Avg Loss = 0.145571, LR = 1.3e-05
+Epoch 143/150: Avg Loss = 0.145535, LR = 1.3e-05
+Epoch 144/150: Avg Loss = 0.152658, LR = 1.3e-05
+Epoch 145/150: Avg Loss = 0.154223, LR = 1.3e-05
+Epoch 146/150: Avg Loss = 0.156685, LR = 6.3e-06
+Epoch 147/150: Avg Loss = 0.150252, LR = 6.3e-06
+Epoch 148/150: Avg Loss = 0.142816, LR = 6.3e-06
+Epoch 149/150: Avg Loss = 0.147002, LR = 6.3e-06
+Epoch 150/150: Avg Loss = 0.136678, LR = 6.3e-06
+
+[REMOTE INFO] Training finished.
+✅ Model saved to 'arxiv-6_layer-model-jigsaw.pth'
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/whenthedarknightrises/main/ap-5HJH8wiTudOc4X2ybUzu0V

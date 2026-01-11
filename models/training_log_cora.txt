@@ -1,0 +1,185 @@
+✓ Initialized. View run at 
+https://modal.com/apps/swastik9895/main/ap-F8o17IvuyxTokUpymw9bVw
+
+    files
+    files
+    c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py: Finalizing 
+    index of 1 files
+    c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py: Finalizing 
+    index of 1 files
+    c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py
+│   c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py
+│   c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py
+│   c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py
+│   c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py
+
+│   c:\Users\Swastik\Desktop\GNN\mag_model\train_jigsaw_model.py
+🚀 Starting Jigsaw GNN training on Modal for cora...
+[REMOTE INFO] Using device: cuda
+[REMOTE INFO] Loading CoraFull...
+Downloading https://github.com/abojchevski/graph2gauss/raw/master/data/cora.npz
+Processing...
+Done!
+
+[INFO] Symmetrizing full graph with SparseTensor...
+  - Undirected edges: 126842
+[INFO] Graph loaded. Keeping structure on CPU to optimize memory usage.
+[INFO] Skipping NodeFeatureAugmentor for cora...
+
+[INFO] Base features: 8710, Augmented features: 8710
+[SETUP] Building SparseTensor adjacency for efficient slicing (on CPU)...
+  - SparseTensor built and on CPU.
+/usr/local/lib/python3.11/site-packages/torch/optim/lr_scheduler.py:28: UserWarning: The verbose parameter is deprecated. Please use get_last_lr() to access the learning rate.
+  warnings.warn("The verbose parameter is deprecated. Please use get_last_lr() "
+[CONFIG] Target Partitioning for cora: Coarse=20, Fine=10
+[CACHE] Found cached hierarchies at /cache/cora_hierarchies_v5.pt. Loading...
+[CACHE] Successfully loaded 3 hierarchies!
+--------------------------------------------------
+[INFO] Creating Graph and SparseTensor copies on CPU for parallel sampling...
+[INFO] Creating independent CPU hierarchy copy...
+[RESUME] Found checkpoint at /cache/cora_checkpoint_A100.pt. Loading...
+[RESUME] Successfully resumed from Epoch 98 (Last completed: 97)
+
+[1AEpoch 99/100:   0%|          | 0/50 [00:00<?, ?step/s]                                                      Epoch 99/100:   0%|          | 0/50 [00:00<?, ?step/s]
+[Step 0] Fallback-CPU | Wait:0.701s | GenAvg:0.075s | Types: { multi-coarse-opt:6, single-part:1, k-hop:1 }
+          Hierarchy usage: { H2:4, H1:2, H0:2 }
+[1AEpoch 99/100:   0%|          | 0/50 [00:00<?, ?step/s]
+[1AEpoch 99/100:   0%|          | 0/50 [00:02<?, ?step/s, loss=0.019]
+[1AEpoch 99/100:   0%|          | 0/50 [00:03<?, ?step/s, loss=0.0129]        
+[Step 2] Fallback-CPU | Wait:0.766s | GenAvg:0.082s | Types: { multi-coarse-opt:5, sibling-walk:2, single-part:1 }
+[1AEpoch 99/100:   0%|          | 0/50 [00:03<?, ?step/s, loss=0.0129]
+[1AEpoch 99/100:   0%|          | 0/50 [00:04<?, ?step/s, loss=0.0294]        
+[Step 3] Fallback-CPU | Wait:0.648s | GenAvg:0.067s | Types: { single-part:1, multi-coarse-opt:5, sibling-walk:2 }
+[1AEpoch 99/100:   0%|          | 0/50 [00:04<?, ?step/s, loss=0.0294]
+[1AEpoch 99/100:   0%|          | 0/50 [00:05<?, ?step/s, loss=0.591]         
+[Step 4] Fallback-CPU | Wait:0.613s | GenAvg:0.063s | Types: { k-hop:2, multi-coarse-opt:4, sibling-walk:2 }
+[1AEpoch 99/100:   0%|          | 0/50 [00:05<?, ?step/s, loss=0.591]
+[1AEpoch 99/100:   0%|          | 0/50 [00:06<?, ?step/s, loss=0.32] 
+[1AEpoch 99/100:   0%|          | 0/50 [00:08<?, ?step/s, loss=0.034]
+[1AEpoch 99/100:   0%|          | 0/50 [00:11<?, ?step/s, loss=0.118]
+[1AEpoch 99/100:   0%|          | 0/50 [00:13<?, ?step/s, loss=0.115]
+[1AEpoch 99/100:   0%|          | 0/50 [00:15<?, ?step/s, loss=0.0505]Epoch 99/100:   0%|          | 0/50 [00:16<?, ?step/s, loss=0.174]
+[Step 10] Worker-CPU | Wait:0.000s | GenAvg:0.091s | Types: { multi-coarse-opt:5, k-hop:2, sibling-walk:1 }
+[1AEpoch 99/100:   0%|          | 0/50 [00:16<?, ?step/s, loss=0.174]
+[1AEpoch 99/100:   0%|          | 0/50 [00:19<?, ?step/s, loss=0.0355]
+[1AEpoch 99/100:   0%|          | 0/50 [00:21<?, ?step/s, loss=0.152] 
+[1AEpoch 99/100:   0%|          | 0/50 [00:23<?, ?step/s, loss=0.0204]
+[1AEpoch 99/100:   0%|          | 0/50 [00:24<?, ?step/s, loss=0.024] 
+[1AEpoch 99/100:   0%|          | 0/50 [00:26<?, ?step/s, loss=0.0904]
+[1AEpoch 99/100:   0%|          | 0/50 [00:28<?, ?step/s, loss=0.179] Epoch 99/100:   0%|          | 0/50 [00:30<?, ?step/s, loss=0.203]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:30<00:59,  1.79s/step, loss=0.203]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:32<00:59,  1.79s/step, loss=0.153]
+Epoch 99/100:  34%|███▍      | 17/50 [00:37<00:59,  1.79s/step, loss=0.0644]   
+[Step 20] Worker-CPU | Wait:0.000s | GenAvg:0.032s | Types: { multi-coarse-opt:3, k-hop:2, sibling-walk:1, single-part:2 }
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:37<00:59,  1.79s/step, loss=0.0644]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:38<00:59,  1.79s/step, loss=0.111]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:42<00:59,  1.79s/step, loss=0.129]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:43<00:59,  1.79s/step, loss=0.0161]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:45<00:59,  1.79s/step, loss=0.418]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:46<00:59,  1.79s/step, loss=0.264]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:49<00:59,  1.79s/step, loss=0.0671]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:49<00:59,  1.79s/step, loss=0.0671]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:50<00:59,  1.79s/step, loss=0.0204]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:53<00:59,  1.79s/step, loss=0.149]
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:55<00:59,  1.79s/step, loss=0.0213]Epoch 99/100:  34%|███▍      | 17/50 [00:57<00:59,  1.79s/step, loss=0.139]
+[Step 30] Worker-CPU | Wait:0.000s | GenAvg:0.030s | Types: { single-part:1, multi-coarse-opt:6, k-hop:1 }
+[1AEpoch 99/100:  34%|███▍      | 17/50 [00:57<00:59,  1.79s/step, loss=0.139]Epoch 99/100:  34%|███▍      | 17/50 [01:00<00:59,  1.79s/step, loss=0.12]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:00<00:37,  1.98s/step, loss=0.12]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:03<00:37,  1.98s/step, loss=0.0661]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:04<00:37,  1.98s/step, loss=0.535]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:06<00:37,  1.98s/step, loss=0.0131]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:07<00:37,  1.98s/step, loss=0.161]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:08<00:37,  1.98s/step, loss=0.0142]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:09<00:37,  1.98s/step, loss=0.1]  
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:12<00:37,  1.98s/step, loss=0.298]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:14<00:37,  1.98s/step, loss=0.0945]Epoch 99/100:  62%|██████▏   | 31/50 [01:16<00:37,  1.98s/step, loss=0.0349]
+[Step 40] Worker-CPU | Wait:0.000s | GenAvg:0.059s | Types: { k-hop:3, single-part:1, multi-coarse-opt:3, sibling-walk:1 }
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:16<00:37,  1.98s/step, loss=0.0349]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:18<00:37,  1.98s/step, loss=0.113]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:19<00:37,  1.98s/step, loss=0.113]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:20<00:37,  1.98s/step, loss=0.21] 
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:22<00:37,  1.98s/step, loss=0.0413]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:24<00:37,  1.98s/step, loss=0.161]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:25<00:37,  1.98s/step, loss=0.141]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:27<00:37,  1.98s/step, loss=0.152]
+[1AEpoch 99/100:  62%|██████▏   | 31/50 [01:28<00:37,  1.98s/step, loss=0.288]
+Epoch 99/100:  62%|██████▏   | 31/50 [01:31<00:37,  1.98s/step, loss=0.182]
+[1AEpoch 99/100:  98%|█████████▊| 49/50 [01:31<00:01,  1.86s/step, loss=0.182]Epoch 99/100:  98%|█████████▊| 49/50 [01:34<00:01,  1.86s/step, loss=0.117]Epoch 99/100: 100%|██████████| 50/50 [01:34<00:00,  1.89s/step, loss=0.117]
+Epoch 99 Summary: Avg Loss = 0.137066, LR = 3.1e-06, GPU Mem: 2.10/5.39 GB
+
+[Step 0] Fallback-CPU | Wait:0.844s | GenAvg:0.092s | Types: { multi-coarse-opt:6, k-hop:2 }
+          Hierarchy usage: { H2:1, H0:5, H1:2 }
+[1AEpoch 100/100:   0%|          | 0/50 [00:00<?, ?step/s]                                                       Epoch 100/100:   0%|          | 0/50 [00:00<?, ?step/s]
+[1AEpoch 100/100:   0%|          | 0/50 [00:00<?, ?step/s]
+[Step 1] Fallback-CPU | Wait:0.533s | GenAvg:0.053s | Types: { k-hop:5, multi-coarse-opt:2, sibling-walk:1 }
+[1AEpoch 100/100:   0%|          | 0/50 [00:01<?, ?step/s, loss=0.0411]       
+[1AEpoch 100/100:   0%|          | 0/50 [00:02<?, ?step/s, loss=0.0411]
+[1AEpoch 100/100:   0%|          | 0/50 [00:02<?, ?step/s, loss=0.397]        
+[Step 2] Fallback-CPU | Wait:0.916s | GenAvg:0.101s | Types: { multi-coarse-opt:6, k-hop:1, sibling-walk:1 }
+[1AEpoch 100/100:   0%|          | 0/50 [00:03<?, ?step/s, loss=0.397]
+[1AEpoch 100/100:   0%|          | 0/50 [00:04<?, ?step/s, loss=0.0139]
+[1AEpoch 100/100:   0%|          | 0/50 [00:04<?, ?step/s, loss=0.0477]       
+[Step 4] Fallback-CPU | Wait:0.527s | GenAvg:0.053s | Types: { multi-coarse-opt:5, single-part:1, k-hop:1, sibling-walk:1 }
+[1AEpoch 100/100:   0%|          | 0/50 [00:05<?, ?step/s, loss=0.0477]
+[Step 5] Fallback-CPU | Wait:0.633s | GenAvg:0.066s | Types: { single-part:2, multi-coarse-opt:4, sibling-walk:1, k-hop:1 }
+[1AEpoch 100/100:   0%|          | 0/50 [00:05<?, ?step/s, loss=0.127]        
+[1AEpoch 100/100:   0%|          | 0/50 [00:06<?, ?step/s, loss=0.127]
+[1AEpoch 100/100:   0%|          | 0/50 [00:06<?, ?step/s, loss=0.0818]
+[1AEpoch 100/100:   0%|          | 0/50 [00:09<?, ?step/s, loss=0.139] 
+[1AEpoch 100/100:   0%|          | 0/50 [00:11<?, ?step/s, loss=0.0574]
+[1AEpoch 100/100:   0%|          | 0/50 [00:13<?, ?step/s, loss=0.15]  Epoch 100/100:   0%|          | 0/50 [00:16<?, ?step/s, loss=0.141]
+[Step 10] Worker-CPU | Wait:0.000s | GenAvg:0.043s | Types: { sibling-walk:2, multi-coarse-opt:5, k-hop:1 }
+[1AEpoch 100/100:   0%|          | 0/50 [00:16<?, ?step/s, loss=0.141]
+[1AEpoch 100/100:   0%|          | 0/50 [00:18<?, ?step/s, loss=0.0578]
+[1AEpoch 100/100:   0%|          | 0/50 [00:20<?, ?step/s, loss=0.138] 
+[1AEpoch 100/100:   0%|          | 0/50 [00:22<?, ?step/s, loss=0.0238]
+[1AEpoch 100/100:   0%|          | 0/50 [00:23<?, ?step/s, loss=0.31]  
+[1AEpoch 100/100:   0%|          | 0/50 [00:26<?, ?step/s, loss=0.357]
+[1AEpoch 100/100:   0%|          | 0/50 [00:28<?, ?step/s, loss=0.278]
+[1AEpoch 100/100:   0%|          | 0/50 [00:29<?, ?step/s, loss=0.189]Epoch 100/100:   0%|          | 0/50 [00:32<?, ?step/s, loss=0.111]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:32<00:57,  1.80s/step, loss=0.111]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:34<00:57,  1.80s/step, loss=0.0365]Epoch 100/100:  36%|███▌      | 18/50 [00:35<00:57,  1.80s/step, loss=0.237]
+[Step 20] Worker-CPU | Wait:0.000s | GenAvg:0.060s | Types: { sibling-walk:3, multi-coarse-opt:2, single-part:2, k-hop:1 }
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:35<00:57,  1.80s/step, loss=0.237]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:36<00:57,  1.80s/step, loss=0.358]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:38<00:57,  1.80s/step, loss=0.061]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:40<00:57,  1.80s/step, loss=0.208]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:42<00:57,  1.80s/step, loss=0.365]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:44<00:57,  1.80s/step, loss=0.365]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:44<00:57,  1.80s/step, loss=0.196]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:46<00:57,  1.80s/step, loss=0.269]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:48<00:57,  1.80s/step, loss=0.0829]
+
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:51<00:57,  1.80s/step, loss=0.0182]Epoch 100/100:  36%|███▌      | 18/50 [00:54<00:57,  1.80s/step, loss=0.124]
+[Step 30] Worker-CPU | Wait:0.000s | GenAvg:0.030s | Types: { multi-coarse-opt:5, single-part:1, sibling-walk:2 }
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:54<00:57,  1.80s/step, loss=0.124]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:56<00:57,  1.80s/step, loss=0.186]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:57<00:57,  1.80s/step, loss=0.0641]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [00:58<00:57,  1.80s/step, loss=0.153]
+[1AEpoch 100/100:  36%|███▌      | 18/50 [01:00<00:57,  1.80s/step, loss=0.141]Epoch 100/100:  36%|███▌      | 18/50 [01:03<00:57,  1.80s/step, loss=0.173]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:03<00:27,  1.80s/step, loss=0.173]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:04<00:27,  1.80s/step, loss=0.21]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:06<00:27,  1.80s/step, loss=0.226]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:08<00:27,  1.80s/step, loss=0.253]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:10<00:27,  1.80s/step, loss=0.0484]Epoch 100/100:  70%|███████   | 35/50 [01:11<00:27,  1.80s/step, loss=0.198]
+[Step 40] Worker-CPU | Wait:0.000s | GenAvg:0.054s | Types: { k-hop:2, sibling-walk:1, multi-coarse-opt:4, single-part:1 }
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:11<00:27,  1.80s/step, loss=0.198]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:13<00:27,  1.80s/step, loss=0.0176]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:14<00:27,  1.80s/step, loss=0.0176]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:15<00:27,  1.80s/step, loss=0.348]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:17<00:27,  1.80s/step, loss=0.224]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:18<00:27,  1.80s/step, loss=0.698]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:20<00:27,  1.80s/step, loss=0.0271]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:22<00:27,  1.80s/step, loss=0.074]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:24<00:27,  1.80s/step, loss=0.0817]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:27<00:27,  1.80s/step, loss=0.122]
+[1AEpoch 100/100:  70%|███████   | 35/50 [01:28<00:27,  1.80s/step, loss=0.00926]Epoch 100/100:  70%|███████   | 35/50 [01:29<00:27,  1.80s/step, loss=0.343]  Epoch 100/100: 100%|██████████| 50/50 [01:29<00:00,  1.79s/step, loss=0.343]
+Epoch 100 Summary: Avg Loss = 0.164486, LR = 3.1e-06, GPU Mem: 0.96/3.05 GB
+[CHECKPOINT] Saving checkpoint to /cache/cora_checkpoint_A100.pt...
+[CHECKPOINT] Volume committed successfully.
+
+[REMOTE INFO] Training finished.
+✅ Model saved to 'cora-6_layer-model-jigsaw.pth'
+
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
