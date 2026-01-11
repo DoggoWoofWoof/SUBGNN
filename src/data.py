@@ -345,10 +345,10 @@ def load_dataset(name: str, root: str = "/tmp"):
         
         # Fix for PyTorch 2.6+ weights_only default change
         try:
-            import torch.serialization
+            from torch import serialization as torch_serialization
             from torch_geometric.data.data import DataEdgeAttr, DataTensorAttr
             from torch_geometric.data.storage import GlobalStorage
-            torch.serialization.add_safe_globals([DataEdgeAttr, DataTensorAttr, GlobalStorage])
+            torch_serialization.add_safe_globals([DataEdgeAttr, DataTensorAttr, GlobalStorage])
         except Exception:
             pass  # Older PyTorch versions don't need this
         
@@ -366,10 +366,10 @@ def load_dataset(name: str, root: str = "/tmp"):
         
         # Fix for PyTorch 2.6+ weights_only default change
         try:
-            import torch.serialization
+            from torch import serialization as torch_serialization
             from torch_geometric.data.data import DataEdgeAttr, DataTensorAttr
             from torch_geometric.data.storage import GlobalStorage
-            torch.serialization.add_safe_globals([DataEdgeAttr, DataTensorAttr, GlobalStorage])
+            torch_serialization.add_safe_globals([DataEdgeAttr, DataTensorAttr, GlobalStorage])
         except Exception:
             pass  # Older PyTorch versions don't need this
         
@@ -396,3 +396,71 @@ def build_hierarchy(data, num_coarse: int, num_fine: int):
         Dict with hierarchy data
     """
     return build_single_hierarchy(data, num_coarse, num_fine)
+
+
+# =============================================================================
+# HIERARCHY CACHING
+# =============================================================================
+
+def save_hierarchy(hierarchy: dict, path: str):
+    """
+    Save hierarchy to pickle file for caching.
+    
+    Args:
+        hierarchy: Dict containing partition data
+        path: File path to save to (.pkl)
+    """
+    import pickle
+    import os
+    os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+    with open(path, 'wb') as f:
+        pickle.dump(hierarchy, f)
+    print(f"[INFO] Saved hierarchy to {path}")
+
+
+def load_hierarchy(path: str) -> dict:
+    """
+    Load hierarchy from pickle file.
+    
+    Args:
+        path: File path to load from (.pkl)
+        
+    Returns:
+        Dict with hierarchy data
+    """
+    import pickle
+    with open(path, 'rb') as f:
+        hierarchy = pickle.load(f)
+    print(f"[INFO] Loaded hierarchy from {path}")
+    return hierarchy
+
+
+def get_or_build_hierarchy(
+    data, 
+    num_coarse: int, 
+    num_fine: int, 
+    cache_path: str = None
+) -> dict:
+    """
+    Load cached hierarchy if available, otherwise build and cache.
+    
+    Args:
+        data: PyG Data object
+        num_coarse: Number of coarse partitions
+        num_fine: Number of fine partitions per coarse
+        cache_path: Optional path x hierarchy pickle (e.g., 'cache/cora_hierarchy.pkl')
+        
+    Returns:
+        Dict with hierarchy data
+    """
+    import os
+    
+    if cache_path and os.path.exists(cache_path):
+        return load_hierarchy(cache_path)
+    
+    hierarchy = build_hierarchy(data, num_coarse, num_fine)
+    
+    if cache_path:
+        save_hierarchy(hierarchy, cache_path)
+    
+    return hierarchy

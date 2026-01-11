@@ -98,6 +98,105 @@ def _finalize_query_from_nodes(
     return Gq, final_global_nodes
 
 
+def generate_k_hop_query(
+    original_data: Data,
+    adj_t: SparseTensor = None,
+    node_to_coarse_map: dict = None,
+    k: int = 3,
+    min_nodes: int = 20,
+    max_nodes: int = 100,
+    device: torch.device = None,
+    **kwargs
+) -> Optional[Tuple[Data, Data, List[int], Set[int]]]:
+    """
+    Generate k-hop subgraph query from random anchor node.
+    
+    Args:
+        original_data: Full graph Data object
+        adj_t: Sparse adjacency tensor (optional)
+        node_to_coarse_map: Dict mapping global node ID -> coarse partition idx
+        k: Number of hops
+        min_nodes: Minimum query nodes
+        max_nodes: Maximum query nodes
+        device: Torch device
+        
+    Returns:
+        (query_data, target_data, query_global_ids, true_coarse_indices) or None
+    """
+    if device is None:
+        device = DEVICE
+    
+    num_nodes = original_data.num_nodes
+    
+    for attempt in range(20):
+        anchor = random.randint(0, num_nodes - 1)
+        
+        # Extract k-hop subgraph
+        subset, edge_index, mapping, edge_mask = k_hop_subgraph(
+            node_idx=anchor,
+            num_hops=k,
+            edge_index=original_data.edge_index,
+            relabel_nodes=True,
+            num_nodes=num_nodes
+        )
+        
+        if len(subset) < min_nodes:
+            continue
+        
+        # Limit to max_nodes via BFS from anchor
+        if len(subset) > max_nodes:
+            subset_list = subset.tolist()
+            anchor_pos = mapping.item() if mapping.numel() == 1 else 0
+            
+            # Build local graph for BFS
+            local_nx = nx.Graph()
+            local_nx.add_edges_from(edge_index.t().tolist())
+            
+            if local_nx.number_of_nodes() == 0:
+                continue
+            
+            # BFS to get max_nodes closest to anchor
+            visited = {anchor_pos}
+            queue = [anchor_pos]
+            while len(visited) < max_nodes and queue:
+                curr = queue.pop(0)
+                for neighbor in local_nx.neighbors(curr):
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        queue.append(neighbor)
+                        if len(visited) >= max_nodes:
+                            break
+            
+            # Map back to global IDs
+            selected_local = list(visited)
+            query_global_ids = [subset_list[i] for i in selected_local if i < len(subset_list)]
+        else:
+            query_global_ids = subset.tolist()
+        
+        if len(query_global_ids) < min_nodes:
+            continue
+        
+        # Create query subgraph
+        query_data, final_global_ids = _finalize_query_from_nodes(
+            original_data, query_global_ids, min_nodes, device
+        )
+        
+        if query_data is None:
+            continue
+        
+        # Determine true coarse partitions
+        true_coarse_indices = set()
+        if node_to_coarse_map:
+            for gid in final_global_ids:
+                if gid in node_to_coarse_map:
+                    true_coarse_indices.add(node_to_coarse_map[gid])
+        
+        # Target is the query itself (for k-hop, query == target ground truth)
+        return query_data, query_data, final_global_ids, true_coarse_indices
+    
+    return None
+
+
 def generate_single_partition_query(
     **kwargs,
 ) -> Tuple[Data, Data, List[int], List[int], Set[int]]:

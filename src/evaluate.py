@@ -30,6 +30,12 @@ from src.config import (
 )
 from src.model import ImprovedSubgraphEncoder, get_graph_embedding
 from src.vf2_matcher import vf2_verify_subgraph, MatchResult
+from src.query_generator import (
+    generate_k_hop_query,
+    generate_single_partition_query,
+    generate_multi_fine_partition_query,
+    generate_multi_coarse_partition_query,
+)
 
 
 # =============================================================================
@@ -156,257 +162,48 @@ def aggregate_metrics(results: List[Dict]) -> EvaluationMetrics:
 
 
 # =============================================================================
-# QUERY GENERATION (Evaluation-specific wrappers)
+# CHECKPOINTING (Resumable Evaluation)
 # =============================================================================
 
-def generate_eval_k_hop_query(
-    original_data: Data,
-    adj_t: SparseTensor,
-    k: int = 3,
-    min_nodes: int = 20,
-    max_nodes: int = 100,
-    **kwargs
-) -> Optional[Tuple[Data, Data, torch.Tensor, set]]:
+def save_checkpoint(results: list, checkpoint_path: str, completed_keys: set):
     """
-    Generate k-hop query for evaluation.
+    Save evaluation progress for resumability.
+    
+    Args:
+        results: List of result dicts
+        checkpoint_path: Path to checkpoint JSON
+        completed_keys: Set of completed (query_type, partition_idx) tuples
+    """
+    import json
+    checkpoint_data = {
+        'completed_keys': [list(k) for k in completed_keys],  # Convert tuples for JSON
+        'results': results
+    }
+    with open(checkpoint_path, 'w') as f:
+        json.dump(checkpoint_data, f)
+
+
+def load_checkpoint(checkpoint_path: str):
+    """
+    Load evaluation progress.
     
     Returns:
-        (query_graph, target_graph, query_global_ids, true_coarse_indices)
+        (completed_keys: set of (query_type, partition_idx), results: list)
     """
-    device = original_data.x.device
-    anchor = torch.randint(0, original_data.num_nodes, (1,), device=device).item()
-    
-    try:
-        subset, _, _, _ = k_hop_subgraph(anchor, k, original_data.edge_index, relabel_nodes=False)
-    except Exception:
-        return None
-    
-    if len(subset) < min_nodes:
-        return None
-    
-    # Sample query nodes from k-hop neighborhood
-    if len(subset) > max_nodes:
-        perm = torch.randperm(len(subset))[:max_nodes]
-        query_nodes = subset[perm]
-    else:
-        query_nodes = subset
-    
-    # Build query and target graphs
-    query_data = _extract_subgraph(adj_t, query_nodes, original_data)
-    target_data = _extract_subgraph(adj_t, subset, original_data)
-    
-    if query_data is None or target_data is None:
-        return None
-    
-    # Get coarse partition info
-    node_to_coarse = kwargs.get('node_to_coarse_map', {})
-    true_coarse = {node_to_coarse.get(n.item(), -1) for n in query_nodes}
-    true_coarse.discard(-1)
-    
-    return query_data, target_data, query_nodes, true_coarse
+    import json
+    if not os.path.exists(checkpoint_path):
+        return set(), []
+    with open(checkpoint_path, 'r') as f:
+        data = json.load(f)
+    completed_keys = {tuple(k) for k in data.get('completed_keys', [])}
+    results = data.get('results', [])
+    print(f"[INFO] Loaded checkpoint: {len(completed_keys)} partitions completed, {len(results)} results")
+    return completed_keys, results
 
 
-def generate_eval_single_partition_query(
-    original_data: Data,
-    adj_t: SparseTensor,
-    fine_graphs: List[Data],
-    fine_part_nodes_map: Dict[int, torch.Tensor],
-    fine_to_coarse_map: Dict[int, int],
-    anchor_fine_idx: Optional[int] = None,
-    min_nodes: int = 20,
-    max_nodes: int = 60,
-    **kwargs
-) -> Optional[Tuple[Data, Data, torch.Tensor, set, int]]:
-    """
-    Generate single partition query for evaluation.
-    
-    Returns:
-        (query_graph, target_graph, query_global_ids, true_coarse_indices, fine_idx)
-    """
-    if not fine_graphs:
-        return None
-    
-    # Select fine partition
-    if anchor_fine_idx is not None and anchor_fine_idx in fine_part_nodes_map:
-        fine_idx = anchor_fine_idx
-    else:
-        fine_idx = random.choice(list(fine_part_nodes_map.keys()))
-    
-    fine_nodes = fine_part_nodes_map[fine_idx]
-    
-    if len(fine_nodes) < min_nodes:
-        return None
-    
-    # Sample query nodes
-    target_size = random.randint(min_nodes, min(max_nodes, len(fine_nodes)))
-    perm = torch.randperm(len(fine_nodes))[:target_size]
-    query_nodes = fine_nodes[perm]
-    
-    # Build graphs
-    query_data = _extract_subgraph(adj_t, query_nodes, original_data)
-    target_data = _extract_subgraph(adj_t, fine_nodes, original_data)
-    
-    if query_data is None or target_data is None:
-        return None
-    
-    coarse_idx = fine_to_coarse_map.get(fine_idx)
-    true_coarse = {coarse_idx} if coarse_idx is not None else set()
-    
-    return query_data, target_data, query_nodes, true_coarse, fine_idx
-
-
-def generate_eval_multi_coarse_query(
-    original_data: Data,
-    adj_t: SparseTensor,
-    coarse_part_graph,
-    fine_graphs: List[Data],
-    fine_part_nodes_map: Dict[int, torch.Tensor],
-    fine_to_coarse_map: Dict[int, int],
-    coarse_to_fine_map: Dict[int, List[int]],
-    coarse_part_nodes_map: Dict[int, torch.Tensor],
-    min_nodes: int = 40,
-    max_nodes: int = 100,
-    min_coarse: int = 2,
-    **kwargs
-) -> Optional[Tuple[Data, Data, torch.Tensor, set, List[int]]]:
-    """
-    Generate multi-coarse partition query for evaluation.
-    
-    Returns:
-        (query_graph, target_graph, query_global_ids, true_coarse_indices, fine_indices)
-    """
-    if coarse_part_graph.number_of_edges() == 0:
-        return None
-    
-    # Get a random edge between coarse partitions
-    edges = list(coarse_part_graph.edges())
-    if not edges:
-        return None
-    
-    c1, c2 = random.choice(edges)
-    
-    # Get fine partitions from both coarse
-    fines_c1 = coarse_to_fine_map.get(c1, [])
-    fines_c2 = coarse_to_fine_map.get(c2, [])
-    
-    if not fines_c1 or not fines_c2:
-        return None
-    
-    # Select one fine from each
-    f1 = random.choice(fines_c1)
-    f2 = random.choice(fines_c2)
-    
-    fine_indices = [f1, f2]
-    
-    # Collect nodes
-    nodes_per_fine = max_nodes // 2
-    all_nodes = []
-    
-    for fidx in fine_indices:
-        fnodes = fine_part_nodes_map.get(fidx)
-        if fnodes is not None and len(fnodes) > 0:
-            sample_size = min(nodes_per_fine, len(fnodes))
-            perm = torch.randperm(len(fnodes))[:sample_size]
-            all_nodes.extend(fnodes[perm].tolist())
-    
-    if len(all_nodes) < min_nodes:
-        return None
-    
-    query_nodes = torch.tensor(all_nodes, dtype=torch.long, device=original_data.x.device)
-    
-    # Target = union of both coarse partitions
-    target_nodes = torch.cat([coarse_part_nodes_map[c1], coarse_part_nodes_map[c2]])
-    
-    query_data = _extract_subgraph(adj_t, query_nodes, original_data)
-    target_data = _extract_subgraph(adj_t, target_nodes, original_data)
-    
-    if query_data is None or target_data is None:
-        return None
-    
-    true_coarse = {c1, c2}
-    
-    return query_data, target_data, query_nodes, true_coarse, fine_indices
-
-
-def generate_eval_sibling_walk_query(
-    original_data: Data,
-    adj_t: SparseTensor,
-    fine_graphs: List[Data],
-    fine_part_nodes_map: Dict[int, torch.Tensor],
-    fine_to_coarse_map: Dict[int, int],
-    coarse_to_fine_map: Dict[int, List[int]],
-    anchor_coarse_idx: Optional[int] = None,
-    num_fine: int = 3,
-    min_nodes: int = 30,
-    max_nodes: int = 80,
-    **kwargs
-) -> Optional[Tuple[Data, Data, torch.Tensor, set, List[int]]]:
-    """
-    Generate sibling-walk query (multiple fine partitions within same coarse).
-    
-    Similar to multi-fine partition query - stitches fragments from 2-4 
-    neighboring fine partitions within the SAME coarse partition.
-    
-    Returns:
-        (query_graph, target_graph, query_global_ids, true_coarse_indices, fine_indices)
-    """
-    if not fine_graphs or not coarse_to_fine_map:
-        return None
-    
-    # Select a coarse partition
-    if anchor_coarse_idx is not None and anchor_coarse_idx in coarse_to_fine_map:
-        coarse_idx = anchor_coarse_idx
-    else:
-        valid_coarse = [c for c, fines in coarse_to_fine_map.items() if len(fines) >= 2]
-        if not valid_coarse:
-            return None
-        coarse_idx = random.choice(valid_coarse)
-    
-    siblings = coarse_to_fine_map.get(coarse_idx, [])
-    if len(siblings) < 2:
-        return None
-    
-    # Select 2-4 fine partitions within this coarse
-    num_to_select = min(num_fine, len(siblings))
-    selected_fines = random.sample(siblings, num_to_select)
-    
-    # Collect nodes from each fine partition
-    nodes_per_fine = max_nodes // num_to_select
-    all_nodes = []
-    
-    for fine_idx in selected_fines:
-        fine_nodes = fine_part_nodes_map.get(fine_idx)
-        if fine_nodes is not None and len(fine_nodes) > 0:
-            sample_size = min(nodes_per_fine, len(fine_nodes))
-            perm = torch.randperm(len(fine_nodes))[:sample_size]
-            all_nodes.extend(fine_nodes[perm].tolist())
-    
-    if len(all_nodes) < min_nodes:
-        return None
-    
-    query_nodes = torch.tensor(all_nodes, dtype=torch.long, device=original_data.x.device)
-    
-    # Target = union of all selected fine partitions
-    target_nodes_list = []
-    for fine_idx in selected_fines:
-        fine_nodes = fine_part_nodes_map.get(fine_idx)
-        if fine_nodes is not None:
-            target_nodes_list.append(fine_nodes)
-    
-    if not target_nodes_list:
-        return None
-    
-    target_nodes = torch.cat(target_nodes_list)
-    
-    query_data = _extract_subgraph(adj_t, query_nodes, original_data)
-    target_data = _extract_subgraph(adj_t, target_nodes, original_data)
-    
-    if query_data is None or target_data is None:
-        return None
-    
-    true_coarse = {coarse_idx}
-    
-    return query_data, target_data, query_nodes, true_coarse, selected_fines
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
 
 
 def _extract_subgraph(adj_t: SparseTensor, node_indices: torch.Tensor, original_data: Data) -> Optional[Data]:
@@ -677,7 +474,8 @@ def run_stratified_evaluation(
     query_types: List[str] = ['k_hop', 'single', 'multi_coarse'],
     queries_per_partition: int = 10,
     top_k: int = 5,
-    device: torch.device = None
+    device: torch.device = None,
+    checkpoint_path: str = None  # NEW: Path for resumability
 ) -> pd.DataFrame:
     """
     Run stratified evaluation across all coarse partitions.
@@ -697,18 +495,23 @@ def run_stratified_evaluation(
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     encoder.eval()
+    
+    # Load checkpoint if resuming
+    completed_keys = set()
     all_results = []
+    if checkpoint_path:
+        completed_keys, all_results = load_checkpoint(checkpoint_path)
     
     num_coarse = len(context['coarse_graphs'])
     original_data = context['original_data']
     adj_t = context['adj_t']
     
-    # Query generators
+    # Query generators (using consolidated query_generator module)
     generators = {
-        'k_hop': generate_eval_k_hop_query,
-        'single': generate_eval_single_partition_query,
-        'sibling_walk': generate_eval_sibling_walk_query,
-        'multi_coarse': generate_eval_multi_coarse_query,
+        'k_hop': generate_k_hop_query,
+        'single': generate_single_partition_query,
+        'sibling_walk': generate_multi_fine_partition_query,
+        'multi_coarse': generate_multi_coarse_partition_query,
     }
     
     for query_type in query_types:
@@ -724,45 +527,31 @@ def run_stratified_evaluation(
         pbar = tqdm(range(num_coarse), desc=f"{query_type}", unit="partition")
         
         for anchor_coarse_idx in pbar:
+            # Check if this partition is already done for this query type
+            partition_key = (query_type, anchor_coarse_idx)
+            if partition_key in completed_keys:
+                continue  # Skip completed partition
+            
             for i in range(queries_per_partition):
                 try:
-                    # Generate query
-                    if query_type == 'k_hop':
-                        res = generator(original_data, adj_t, node_to_coarse_map=context.get('node_to_coarse_map', {}))
-                    elif query_type == 'single':
-                        # Get fine indices for this coarse
-                        coarse_to_fine = context.get('coarse_to_fine_map', {})
-                        fine_in_coarse = coarse_to_fine.get(anchor_coarse_idx, [])
-                        anchor_fine = random.choice(fine_in_coarse) if fine_in_coarse else None
-                        
-                        res = generator(
-                            original_data, adj_t,
-                            context['fine_graphs'],
-                            context['fine_part_nodes_map'],
-                            context['fine_to_coarse_map'],
-                            anchor_fine_idx=anchor_fine
-                        )
-                    elif query_type == 'sibling_walk':
-                        res = generator(
-                            original_data, adj_t,
-                            context['fine_graphs'],
-                            context['fine_part_nodes_map'],
-                            context['fine_to_coarse_map'],
-                            context.get('coarse_to_fine_map', {}),
-                            anchor_coarse_idx=anchor_coarse_idx
-                        )
-                    elif query_type == 'multi_coarse':
-                        res = generator(
-                            original_data, adj_t,
-                            context['coarse_part_graph'],
-                            context['fine_graphs'],
-                            context['fine_part_nodes_map'],
-                            context['fine_to_coarse_map'],
-                            context.get('coarse_to_fine_map', {}),
-                            context['coarse_part_nodes_map']
-                        )
-                    else:
-                        continue
+                    # Generate query using consolidated generators (kwargs interface)
+                    gen_kwargs = {
+                        'original_data': original_data,
+                        'adj_t': adj_t,
+                        'device': device,
+                        'min_nodes': QUERY_NODES_MIN,
+                        'max_nodes': QUERY_NODES_MAX,
+                        'fine_graphs': context.get('fine_graphs', []),
+                        'fine_part_nodes_map': context.get('fine_part_nodes_map', {}),
+                        'fine_to_coarse_map': context.get('fine_to_coarse_map', {}),
+                        'coarse_to_fine_map': context.get('coarse_to_fine_map', {}),
+                        'coarse_part_nodes_map': context.get('coarse_part_nodes_map', {}),
+                        'coarse_part_graph': context.get('coarse_part_graph', None),
+                        'node_to_coarse_map': context.get('node_to_coarse_map', {}),
+                        'anchor_coarse_idx': anchor_coarse_idx,
+                    }
+                    
+                    res = generator(**gen_kwargs)
                     
                     if res is None:
                         continue
@@ -790,6 +579,11 @@ def run_stratified_evaluation(
                         'query_type': query_type,
                         'anchor_coarse': anchor_coarse_idx
                     })
+            
+            # Mark partition complete and save checkpoint
+            completed_keys.add(partition_key)
+            if checkpoint_path:
+                save_checkpoint(all_results, checkpoint_path, completed_keys)
     
     return pd.DataFrame(all_results)
 
@@ -859,6 +653,10 @@ def main():
     parser.add_argument('--queries_per_partition', type=int, default=10)
     parser.add_argument('--top_k', type=int, default=5)
     parser.add_argument('--output', type=str, default='evaluation_results.csv')
+    parser.add_argument('--hierarchy_cache', type=str, default=None,
+                        help='Path to cache/load hierarchy pickle (e.g., cache/cora_hierarchy.pkl)')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                        help='Path to checkpoint JSON for resumability')
     
     args = parser.parse_args()
     
@@ -866,7 +664,7 @@ def main():
     print(f"[INFO] Device: {DEVICE}")
     
     # Load data and model
-    from src.data import load_dataset, build_hierarchy
+    from src.data import load_dataset, get_or_build_hierarchy
     from src.model import NodeFeatureAugmentor
     
     data = load_dataset(args.dataset)
@@ -926,9 +724,9 @@ def main():
     if augmentor is not None:
         augmentor.eval()
     
-    # Build hierarchy and context
+    # Build hierarchy and context (with optional caching)
     cfg = PARTITION_CONFIGS.get(args.dataset, PARTITION_CONFIGS['default'])
-    hierarchy = build_hierarchy(data, cfg['coarse'], cfg['fine'])
+    hierarchy = get_or_build_hierarchy(data, cfg['coarse'], cfg['fine'], args.hierarchy_cache)
     
     # Build FAISS index (need to handle augmentor for MAG)
     print("[INFO] Building FAISS index...")
@@ -995,13 +793,14 @@ def main():
         coarse_to_fine[c].append(f)
     context['coarse_to_fine_map'] = dict(coarse_to_fine)
     
-    # Run evaluation
+    # Run evaluation (with optional checkpointing)
     df = run_stratified_evaluation(
         encoder, context,
         query_types=['k_hop', 'single', 'sibling_walk', 'multi_coarse'],
         queries_per_partition=args.queries_per_partition,
         top_k=args.top_k,
-        device=DEVICE
+        device=DEVICE,
+        checkpoint_path=args.checkpoint  # NEW: enable resumability
     )
     
     # Save and print results
