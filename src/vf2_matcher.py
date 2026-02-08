@@ -51,6 +51,57 @@ def pyg_to_networkx(data: Data, node_labels: Optional[Dict[int, Any]] = None) ->
     return G
 
 
+# Module-level worker for multiprocessing (must be at module level for pickle on Windows)
+def _vf2_worker(query_edges, target_edges, query_nodes, target_nodes, 
+               max_sols, timeout, result_queue, start):
+    """Worker process for VF2 matching - at module level for Windows pickle."""
+    import time
+    import networkx as nx
+    from networkx.algorithms.isomorphism import GraphMatcher
+    
+    try:
+        # Reconstruct graphs in subprocess
+        q = nx.Graph()
+        q.add_nodes_from(query_nodes)
+        q.add_edges_from(query_edges)
+        
+        t = nx.Graph()
+        t.add_nodes_from(target_nodes)
+        t.add_edges_from(target_edges)
+        
+        GM = GraphMatcher(t, q)
+        
+        solutions = []
+        time_to_first = -1.0
+        
+        for mapping in GM.subgraph_isomorphisms_iter():
+            now = time.time()
+            if now - start > timeout:
+                break
+            
+            if time_to_first < 0:
+                time_to_first = now - start
+            
+            solutions.append(dict(mapping))
+            if len(solutions) >= max_sols:
+                break
+        
+        result_queue.put({
+            'found': len(solutions) > 0,
+            'num_solutions': len(solutions),
+            'first_mapping': solutions[0] if solutions else None,
+            'time_to_first': time_to_first
+        })
+    except Exception as e:
+        result_queue.put({
+            'found': False,
+            'num_solutions': 0,
+            'first_mapping': None,
+            'time_to_first': -1.0,
+            'error': str(e)
+        })
+
+
 def vf2_subgraph_match(
     query: nx.Graph,
     target: nx.Graph,
@@ -59,64 +110,66 @@ def vf2_subgraph_match(
     timeout_seconds: float = 60.0
 ) -> MatchResult:
     """
-    Perform VF2 subgraph isomorphism matching.
+    Perform VF2 subgraph isomorphism matching with enforced timeout.
+    Uses multiprocessing for true timeout enforcement (processes can be killed).
     
     Args:
         query: Query graph (smaller, to find in target)
         target: Target graph (larger, to search within)
         use_node_labels: Whether to enforce node label matching
         max_solutions: Maximum number of solutions to enumerate
-        timeout_seconds: Timeout for matching
+        timeout_seconds: Timeout for matching (enforced via process)
         
     Returns:
         MatchResult with match statistics
     """
-    from networkx.algorithms.isomorphism import GraphMatcher
-    
-    # Node match function (if using labels)
-    if use_node_labels and 'label' in nx.get_node_attributes(query, 'label'):
-        def node_match(n1_attrs, n2_attrs):
-            return n1_attrs.get('label') == n2_attrs.get('label')
-    else:
-        node_match = None
-    
-    # Create matcher
-    GM = GraphMatcher(target, query, node_match=node_match)
+    from multiprocessing import Process, Queue
     
     start_time = time.time()
-    solutions = []
-    time_to_first = -1.0
+    result_queue = Queue()
     
-    try:
-        # Enumerate solutions up to max_solutions
-        for mapping in GM.subgraph_isomorphisms_iter():
-            now = time.time()
-            if now - start_time > timeout_seconds:
-                break
-            
-            # Track time to first solution
-            if time_to_first < 0:
-                time_to_first = now - start_time
-            
-            solutions.append(mapping)
-            if len(solutions) >= max_solutions:
-                break
-    except Exception as e:
-        print(f"[VF2] Error during matching: {e}")
+    # Prepare data for subprocess (graphs must be serialized)
+    query_edges = list(query.edges())
+    target_edges = list(target.edges())
+    query_nodes = list(query.nodes())
+    target_nodes = list(target.nodes())
+    
+    # Start worker process (using module-level function for Windows pickle)
+    proc = Process(
+        target=_vf2_worker,
+        args=(query_edges, target_edges, query_nodes, target_nodes,
+              max_solutions, timeout_seconds, result_queue, start_time)
+    )
+    proc.start()
+    proc.join(timeout=timeout_seconds)  # Wait with timeout
+    
+    # Kill if still running
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=1)
+        if proc.is_alive():
+            proc.kill()
     
     latency = time.time() - start_time
-    found = len(solutions) > 0
-    first_mapping = solutions[0] if solutions else None
+    
+    # Get result from queue if available
+    try:
+        if not result_queue.empty():
+            result = result_queue.get_nowait()
+        else:
+            result = {'found': False, 'num_solutions': 0, 'first_mapping': None, 'time_to_first': -1.0}
+    except:
+        result = {'found': False, 'num_solutions': 0, 'first_mapping': None, 'time_to_first': -1.0}
     
     return MatchResult(
-        found=found,
-        num_solutions=len(solutions),
-        first_mapping=first_mapping,
+        found=result.get('found', False),
+        num_solutions=result.get('num_solutions', 0),
+        first_mapping=result.get('first_mapping'),
         latency_seconds=latency,
-        node_accuracy=0.0,  # Will be computed externally with ground truth
-        first_solution_accuracy=-1.0,  # Computed in vf2_verify_subgraph
-        time_to_first_solution=time_to_first,
-        time_to_correct_solution=time_to_first if found else -1.0,  # For VF2, first=correct
+        node_accuracy=0.0,
+        first_solution_accuracy=-1.0,
+        time_to_first_solution=result.get('time_to_first', -1.0),
+        time_to_correct_solution=result.get('time_to_first', -1.0) if result.get('found') else -1.0,
         time_to_all_solutions=latency
     )
 
@@ -184,7 +237,7 @@ def vf2_verify_subgraph(
     result = vf2_subgraph_match(
         query_nx, target_nx,
         use_node_labels=use_node_labels,
-        max_solutions=1,  # Just need first for accuracy
+        max_solutions=1,  # Only need to find if subgraph exists
         timeout_seconds=timeout_seconds
     )
     

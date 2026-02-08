@@ -1,3 +1,15 @@
+"""
+Query Generator Module for Evaluation
+
+This module provides NetworkX-based query generation for accurate evaluation.
+Uses NetworkX for interpretable graph operations.
+
+NOTE: For training, use sampling.py instead (SparseTensor-optimized, faster).
+The two modules serve different purposes:
+- query_generator.py: Accurate evaluation with NetworkX (flexible, interpretable)  
+- sampling.py: Fast training with SparseTensor (GPU-optimized)
+"""
+
 import itertools
 import random
 from collections import defaultdict
@@ -143,7 +155,10 @@ def generate_k_hop_query(
         if len(subset) < min_nodes:
             continue
         
-        # Limit to max_nodes via BFS from anchor
+        # Store FULL k-hop neighborhood as target (before trimming)
+        full_khop_global_ids = subset.tolist()
+        
+        # Limit query to max_nodes via BFS from anchor
         if len(subset) > max_nodes:
             subset_list = subset.tolist()
             anchor_pos = mapping.item() if mapping.numel() == 1 else 0
@@ -167,7 +182,7 @@ def generate_k_hop_query(
                         if len(visited) >= max_nodes:
                             break
             
-            # Map back to global IDs
+            # Map back to global IDs for query
             selected_local = list(visited)
             query_global_ids = [subset_list[i] for i in selected_local if i < len(subset_list)]
         else:
@@ -176,7 +191,7 @@ def generate_k_hop_query(
         if len(query_global_ids) < min_nodes:
             continue
         
-        # Create query subgraph
+        # Create query subgraph (sampled subset)
         query_data, final_global_ids = _finalize_query_from_nodes(
             original_data, query_global_ids, min_nodes, device
         )
@@ -184,15 +199,20 @@ def generate_k_hop_query(
         if query_data is None:
             continue
         
-        # Determine true coarse partitions
+        # Create target subgraph (FULL k-hop neighborhood)
+        target_data, target_global_ids = _finalize_query_from_nodes(
+            original_data, full_khop_global_ids, min_nodes, device
+        )
+        
+        # Determine true coarse partitions (from query nodes)
         true_coarse_indices = set()
         if node_to_coarse_map:
             for gid in final_global_ids:
                 if gid in node_to_coarse_map:
                     true_coarse_indices.add(node_to_coarse_map[gid])
         
-        # Target is the query itself (for k-hop, query == target ground truth)
-        return query_data, query_data, final_global_ids, true_coarse_indices
+        # Query is subset, Target is full k-hop neighborhood  
+        return query_data, target_data, final_global_ids, true_coarse_indices
     
     return None
 

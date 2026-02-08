@@ -1,3 +1,15 @@
+"""
+Hierarchical Sampling Module for Training
+
+This module provides SparseTensor-optimized query generation for fast GPU training.
+Uses torch_sparse operations for O(1) neighbor lookups.
+
+NOTE: For evaluation, use query_generator.py instead (NetworkX-based, more accurate).
+The two modules serve different purposes:
+- sampling.py: Fast training with SparseTensor (GPU-optimized)
+- query_generator.py: Accurate evaluation with NetworkX (flexible, interpretable)
+"""
+
 import torch
 import random
 import sys

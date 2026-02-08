@@ -63,7 +63,15 @@ def are_partitions_neighbors(
 ) -> bool:
     """
     Checks if two partitions (node sets) are connected in the original graph.
+    Handles both list and torch.Tensor inputs.
     """
+    import torch
+    # Convert tensors to lists of ints
+    if isinstance(nodes_a, torch.Tensor):
+        nodes_a = nodes_a.tolist()
+    if isinstance(nodes_b, torch.Tensor):
+        nodes_b = nodes_b.tolist()
+    
     node_set_b = set(nodes_b)
     for u in nodes_a:
         # Check neighbors in G_nx
