@@ -31,4 +31,18 @@ wheels/
 .gemini/
 v1/
 
-models/mag*
+# Allow benchmark results
+!benchmarks/
+!benchmarks/**
+
+# Local eval outputs (committed copies are in benchmarks/)
+*_eval_summary.txt
+error.txt
+
+# Temp scripts
+check_*.py
+verify_csv.py
+
+# Data and cache
+cache/
+data/
