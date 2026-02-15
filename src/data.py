@@ -27,11 +27,11 @@ def run_pymetis_in_subprocess(n_parts, xadj, adjncy):
     p = multiprocessing.Process(target=_partitioner_target, args=(q, n_parts, xadj, adjncy))
     p.start()
     try:
-        # 10 minute timeout for partitioning
-        result = q.get(timeout=600)
+        # 2 hour timeout for partitioning
+        result = q.get(timeout=7200)
     except multiprocessing.queues.Empty:
         p.kill()
-        raise RuntimeError(f"METIS partitioning timed out after 600s. Subprocess stuck?")
+        raise RuntimeError(f"METIS partitioning timed out after 7200s. Subprocess stuck?")
     p.join()
     if result is None: raise RuntimeError("Partitioning failed in subprocess.")
     return None, result
@@ -112,17 +112,26 @@ def make_partitions(dataset, num_parts, keep_features=True):
         d.part_id = 0
         return [d], {0: torch.arange(dataset.num_nodes, device=dataset.edge_index.device)}
     
+    # Validate edge index bounds (crucial for Metis stability)
+    if dataset.edge_index.numel() > 0:
+            max_idx = dataset.edge_index.max().item()
+            if max_idx >= dataset.num_nodes:
+                raise RuntimeError(f"Edge index max {max_idx} >= num_nodes {dataset.num_nodes}")
+
     # Partitioning needs to happen on CPU (pymetis requirement usually)
     edge_index_cpu = dataset.edge_index.cpu()
+    
+    # Double check CPU tensor bounds
+    if edge_index_cpu.numel() > 0 and edge_index_cpu.max() >= dataset.num_nodes:
+            raise RuntimeError(f"Edge index contains indices >= num_nodes ({dataset.num_nodes}). Max: {edge_index_cpu.max()}")
     
     adj = SparseTensor.from_edge_index(edge_index_cpu, sparse_sizes=(dataset.num_nodes, dataset.num_nodes))
     xadj_t, adjncy_t, _ = adj.csr(); xadj, adjncy = xadj_t.tolist(), adjncy_t.tolist()
     
-    try:
-        _, membership = run_pymetis_in_subprocess(num_parts, xadj=xadj, adjncy=adjncy)
-    except RuntimeError as e:
-        print(f"Pooling Metis failed: {e}. Falling back to random partition for robustness.")
-        membership = [random.randint(0, num_parts-1) for _ in range(dataset.num_nodes)]
+    scale = 1  
+    import pymetis
+    # Run partitioning in main process to avoid multiprocessing deadlocks
+    _, membership = pymetis.part_graph(num_parts, xadj=xadj, adjncy=adjncy)
     
     part_graphs, part_nodes_map = [], {}
     for part_id in range(num_parts):
@@ -338,6 +347,9 @@ def load_dataset(name: str, root: str = "/tmp"):
             data.node_type = torch.zeros(data.num_nodes, dtype=torch.long)
         if not hasattr(data, 'global_id'):
             data.global_id = torch.arange(data.num_nodes)
+        
+        # Symmetrize to prevent Metis crash
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
         return data
     
     elif name == 'arxiv':
@@ -359,6 +371,9 @@ def load_dataset(name: str, root: str = "/tmp"):
             data.node_type = torch.zeros(data.num_nodes, dtype=torch.long)
         if not hasattr(data, 'global_id'):
             data.global_id = torch.arange(data.num_nodes)
+        
+        # Symmetrize to prevent Metis crash
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
         return data
     
     elif name == 'mag':
@@ -375,6 +390,8 @@ def load_dataset(name: str, root: str = "/tmp"):
         
         dataset = PygNodePropPredDataset(name="ogbn-mag", root=f"{root}/ogbn_mag")
         data = convert_hetero_to_homo(dataset[0])
+        # Symmetrize to prevent Metis crash
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
         return data
     
     else:

@@ -396,6 +396,13 @@ def search_and_verify(
                 global_ids = query_data.global_id.to(original_data.x.device)
                 query_data.x = original_data.x[global_ids].to(device)
         
+        # Ensure node_type is present for augmentor (MAG)
+        if augmentor is not None and (not hasattr(query_data, 'node_type') or query_data.node_type is None):
+            if original_data is not None and hasattr(original_data, 'node_type') and original_data.node_type is not None:
+                if hasattr(query_data, 'global_id') and query_data.global_id is not None:
+                    g_ids = query_data.global_id.to(original_data.node_type.device)
+                    query_data.node_type = original_data.node_type[g_ids].to(device)
+        
         if augmentor is not None:
             query_data = query_data.clone()
             query_data.x = augmentor(query_data)
@@ -449,6 +456,12 @@ def search_and_verify(
                         g.x = original_data.x[global_ids].to(device)
                     else:
                         g.x = torch.zeros(g.num_nodes, original_data.x.size(1), device=device)
+                # Ensure node_type is present for augmentor (MAG)
+                if augmentor is not None and (not hasattr(g, 'node_type') or g.node_type is None):
+                    if original_data is not None and hasattr(original_data, 'node_type') and original_data.node_type is not None:
+                        if hasattr(g, 'global_id') and g.global_id is not None:
+                            g_ids = g.global_id.to(original_data.node_type.device)
+                            g.node_type = original_data.node_type[g_ids].to(device)
                 if augmentor is not None:
                     g = g.clone()
                     g.x = augmentor(g)
@@ -678,6 +691,9 @@ def search_and_verify(
         result['total_time'] = time.time() - total_start
         
     except Exception as e:
+        import traceback
+        print(f"      [S&V] ERROR: {e}", flush=True)
+        traceback.print_exc()
         result['error'] = str(e)
         result['total_time'] = time.time() - total_start
     
@@ -731,8 +747,12 @@ def run_stratified_evaluation(
     
     # Auto-calculate queries_per_partition if not specified
     if queries_per_partition is None:
-        queries_per_partition = max(1, target_queries_per_type // num_coarse)
-        print(f"[INFO] Auto-calculated: {queries_per_partition} queries/partition x {num_coarse} partitions = ~{queries_per_partition * num_coarse} queries/type")
+        if target_queries_per_type < num_coarse:
+             queries_per_partition = 1 # Will sample partitions later
+             print(f"[INFO] target_queries ({target_queries_per_type}) < num_partitions ({num_coarse}). Will sample {target_queries_per_type} partitions randomly.")
+        else:
+             queries_per_partition = max(1, target_queries_per_type // num_coarse)
+             print(f"[INFO] Auto-calculated: {queries_per_partition} queries/partition x {num_coarse} partitions = ~{queries_per_partition * num_coarse} queries/type")
     
     # Query generators (using consolidated query_generator module)
     generators = {
@@ -742,6 +762,8 @@ def run_stratified_evaluation(
         'multi_coarse': generate_multi_coarse_partition_query,
     }
     
+    import random
+
     for query_type in query_types:
         if query_type not in generators:
             print(f"[WARN] Unknown query type: {query_type}")
@@ -752,7 +774,19 @@ def run_stratified_evaluation(
         print(f"Evaluating query type: {query_type.upper()}")
         print(f"{'='*60}")
         
-        pbar = tqdm(range(num_coarse), desc=f"{query_type}", unit="partition")
+        # Determine which partitions to process
+        if target_queries_per_type < num_coarse and queries_per_partition == 1:
+            # Sample random subset of partitions without replacement
+            # Use fixed seed per query type for reproducibility if needed, or unpredictable?
+            # User wants benchmarking -> reproducibility preferred? 
+            # But let's use global random state or just random.sample which is fine.
+            partition_indices = random.sample(range(num_coarse), target_queries_per_type)
+            partition_indices.sort() # Process in order for nicer logs
+        else:
+            # All partitions
+            partition_indices = range(num_coarse)
+
+        pbar = tqdm(partition_indices, desc=f"{query_type}", unit="partition")
         
         for anchor_coarse_idx in pbar:
             # Check if this partition is already done for this query type
@@ -847,81 +881,100 @@ def run_stratified_evaluation(
     return pd.DataFrame(all_results)
 
 
-def print_evaluation_summary(df: pd.DataFrame):
-    """Print formatted evaluation summary."""
-    print("\n" + "="*70)
-    print("EVALUATION SUMMARY")
-    print("="*70)
+def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
+    """Print formatted evaluation summary, optionally saving to a text file."""
+    lines = []
+    
+    def log(msg=""):
+        print(msg)
+        lines.append(msg)
+    
+    log("\n" + "="*70)
+    log("EVALUATION SUMMARY")
+    log("="*70)
     
     # Separate actual queries from summary rows
     actual_queries = df[~df['query_id'].str.contains('_MEDIAN|_AVERAGE', na=False)]
     
-    # Print per-query-type summaries (excluding OVERALL which is a summary, not a query type)
+    # Print per-query-type summaries
     query_types = [qt for qt in df['query_type'].unique() if qt != 'OVERALL']
     
     for query_type in query_types:
         subset = actual_queries[actual_queries['query_type'] == query_type]
         successful = subset[subset['success'] == True]
         
-        print(f"\n--- {query_type.upper()} ---")
-        print(f"  Total queries:       {len(subset)}")
-        print(f"  Successful:          {len(successful)}")
+        log(f"\n--- {query_type.upper()} ---")
+        log(f"  Total queries:       {len(subset)}")
+        log(f"  Successful:          {len(successful)}")
         
         if len(successful) > 0:
-            # Retrieval metrics
-            print(f"  Coarse Recall@1:     {successful['coarse_correct'].mean()*100:.1f}%")
-            print(f"  Coarse Recall@K:     {successful['coarse_in_top_k'].mean()*100:.1f}%")
+            log(f"  Coarse Recall@1:     {successful['coarse_correct'].mean()*100:.1f}%")
+            log(f"  Coarse Recall@K:     {successful['coarse_in_top_k'].mean()*100:.1f}%")
             
-            # Partition coverage metrics (KEY)
             if 'gt_partition_recall' in successful.columns:
-                gt_recall = successful['gt_partition_recall'].mean()*100
-                print(f"  GT Partition Recall: {gt_recall:.1f}%")
+                log(f"  GT Partition Recall: {successful['gt_partition_recall'].mean()*100:.1f}%")
             if 'all_gt_partitions_found' in successful.columns:
-                all_found = successful['all_gt_partitions_found'].mean()*100
-                print(f"  All GT Parts Found:  {all_found:.1f}%")
+                log(f"  All GT Parts Found:  {successful['all_gt_partitions_found'].mean()*100:.1f}%")
+            if 'recall_at_1' in successful.columns:
+                log(f"  Recall@1:            {successful['recall_at_1'].mean()*100:.1f}%")
+            if 'recall_at_5' in successful.columns:
+                log(f"  Recall@5:            {successful['recall_at_5'].mean()*100:.1f}%")
+            if 'recall_at_20' in successful.columns:
+                log(f"  Recall@20:           {successful['recall_at_20'].mean()*100:.1f}%")
             
-            # VF2 metrics (2-way comparison)
             if 'vf2_stitched_found' in successful.columns:
                 vf2_stitched = successful['vf2_stitched_found'].mean()*100
-                print(f"  VF2 Stitched Match:  {vf2_stitched:.1f}% (Our Method)")
+                log(f"  VF2 Stitched Match:  {vf2_stitched:.1f}% (Our Method)")
             if 'vf2_baseline_found' in successful.columns:
                 vf2_base = successful[successful['vf2_baseline_found'].notna()]['vf2_baseline_found'].mean()*100
-                print(f"  VF2 Baseline Match:  {vf2_base:.1f}% (Full Graph)")
+                log(f"  VF2 Baseline Match:  {vf2_base:.1f}% (Full Graph)")
             
-            # Node counts
             if 'query_nodes' in successful.columns:
-                print(f"  Avg Query Nodes:     {successful['query_nodes'].mean():.0f}")
+                log(f"  Avg Query Nodes:     {successful['query_nodes'].mean():.0f}")
             if 'stitched_nodes' in successful.columns:
-                print(f"  Avg Stitched Nodes:  {successful['stitched_nodes'].mean():.0f}")
+                log(f"  Avg Stitched Nodes:  {successful['stitched_nodes'].mean():.0f}")
             if 'num_stitched' in successful.columns:
-                print(f"  Avg Partitions:      {successful['num_stitched'].mean():.1f}")
+                log(f"  Avg Partitions:      {successful['num_stitched'].mean():.1f}")
             
-            # Timing
-            print(f"  Avg Latency:         {successful['total_time'].mean()*1000:.1f}ms")
-            print(f"    - Embedding:       {successful['embed_time'].mean()*1000:.1f}ms")
-            print(f"    - FAISS:           {successful['faiss_time'].mean()*1000:.1f}ms")
-            print(f"    - VF2:             {successful['vf2_time'].mean()*1000:.1f}ms")
+            log(f"  Avg Latency:         {successful['total_time'].mean()*1000:.1f}ms")
+            log(f"    - Embedding:       {successful['embed_time'].mean()*1000:.1f}ms")
+            log(f"    - FAISS:           {successful['faiss_time'].mean()*1000:.1f}ms")
+            log(f"    - VF2:             {successful['vf2_time'].mean()*1000:.1f}ms")
     
-    # Print OVERALL summary computed from ALL actual queries
+    # OVERALL summary
     all_successful = actual_queries[actual_queries['success'] == True]
-    print(f"\n--- OVERALL ---")
-    print(f"  Total queries:       {len(actual_queries)}")
-    print(f"  Successful:          {len(all_successful)}")
+    log(f"\n--- OVERALL ---")
+    log(f"  Total queries:       {len(actual_queries)}")
+    log(f"  Successful:          {len(all_successful)}")
     
     if len(all_successful) > 0:
-        print(f"  Coarse Recall@1:     {all_successful['coarse_correct'].mean()*100:.1f}%")
-        print(f"  Coarse Recall@K:     {all_successful['coarse_in_top_k'].mean()*100:.1f}%")
+        log(f"  Coarse Recall@1:     {all_successful['coarse_correct'].mean()*100:.1f}%")
+        log(f"  Coarse Recall@K:     {all_successful['coarse_in_top_k'].mean()*100:.1f}%")
         if 'gt_partition_recall' in all_successful.columns:
-            print(f"  GT Partition Recall: {all_successful['gt_partition_recall'].mean()*100:.1f}%")
+            log(f"  GT Partition Recall: {all_successful['gt_partition_recall'].mean()*100:.1f}%")
         if 'all_gt_partitions_found' in all_successful.columns:
-            print(f"  All GT Parts Found:  {all_successful['all_gt_partitions_found'].mean()*100:.1f}%")
+            log(f"  All GT Parts Found:  {all_successful['all_gt_partitions_found'].mean()*100:.1f}%")
+        if 'recall_at_1' in all_successful.columns:
+            log(f"  Recall@1:            {all_successful['recall_at_1'].mean()*100:.1f}%")
+        if 'recall_at_5' in all_successful.columns:
+            log(f"  Recall@5:            {all_successful['recall_at_5'].mean()*100:.1f}%")
+        if 'recall_at_20' in all_successful.columns:
+            log(f"  Recall@20:           {all_successful['recall_at_20'].mean()*100:.1f}%")
         if 'vf2_stitched_found' in all_successful.columns:
-            print(f"  VF2 Stitched Match:  {all_successful['vf2_stitched_found'].mean()*100:.1f}% (Our Method)")
+            log(f"  VF2 Stitched Match:  {all_successful['vf2_stitched_found'].mean()*100:.1f}% (Our Method)")
         if 'query_nodes' in all_successful.columns:
-            print(f"  Avg Query Nodes:     {all_successful['query_nodes'].mean():.0f}")
+            log(f"  Avg Query Nodes:     {all_successful['query_nodes'].mean():.0f}")
         if 'stitched_nodes' in all_successful.columns:
-            print(f"  Avg Stitched Nodes:  {all_successful['stitched_nodes'].mean():.0f}")
-        print(f"  Avg Latency:         {all_successful['total_time'].mean()*1000:.1f}ms")
+            log(f"  Avg Stitched Nodes:  {all_successful['stitched_nodes'].mean():.0f}")
+        log(f"  Avg Latency:         {all_successful['total_time'].mean()*1000:.1f}ms")
+    
+    # Save to text file if requested
+    if output_txt:
+        import os
+        os.makedirs(os.path.dirname(output_txt) if os.path.dirname(output_txt) else '.', exist_ok=True)
+        with open(output_txt, 'w') as f:
+            f.write('\n'.join(lines) + '\n')
+        print(f"\n[INFO] Summary saved to {output_txt}")
 
 
 def add_summary_rows(df: pd.DataFrame) -> pd.DataFrame:
@@ -1000,11 +1053,25 @@ def main():
                         help='Run k-hop random sampling baseline (SLOW, for comparison)')
     parser.add_argument('--skip_vf2', action='store_true',
                         help='Skip VF2 verification (faster, only FAISS metrics)')
+    parser.add_argument('--query_types', type=str, default=None,
+                        help='Comma-separated query types to run (e.g. single,multi_coarse). Default: all')
     
     args = parser.parse_args()
     
+    # Parse query types
+    ALL_QUERY_TYPES = ['k_hop', 'single', 'sibling_walk', 'multi_coarse']
+    if args.query_types:
+        active_query_types = [qt.strip() for qt in args.query_types.split(',')]
+        invalid = [qt for qt in active_query_types if qt not in ALL_QUERY_TYPES]
+        if invalid:
+            print(f"[WARN] Unknown query types: {invalid}. Valid: {ALL_QUERY_TYPES}")
+            active_query_types = [qt for qt in active_query_types if qt in ALL_QUERY_TYPES]
+    else:
+        active_query_types = ALL_QUERY_TYPES
+    
     print(f"[INFO] Evaluating on {args.dataset}")
     print(f"[INFO] Device: {DEVICE}")
+    print(f"[INFO] Query types: {active_query_types}")
     
     # Load data and model
     from src.data import load_dataset, get_or_build_hierarchy
@@ -1095,6 +1162,18 @@ def main():
                 print(f"[WARN] Graph missing x and global_id, using zeros")
                 g.x = torch.zeros(g.num_nodes, original_data.x.size(1), device=device)
         
+        # Ensure node_type is present for augmentor (MAG)
+        if augmentor is not None and (not hasattr(g, 'node_type') or g.node_type is None):
+            if original_data is not None and hasattr(original_data, 'node_type') and original_data.node_type is not None:
+                if hasattr(g, 'global_id') and g.global_id is not None:
+                    # Move global_id to same device as original node_type for indexing
+                    g_ids = g.global_id.to(original_data.node_type.device) 
+                    g.node_type = original_data.node_type[g_ids].to(device)
+                else:
+                    # Fallback if no global_id? Assume identity?
+                    # This shouldn't happen for partitions.
+                    pass
+        
         if augmentor is not None:
             g = g.clone()
             g.x = augmentor(g)
@@ -1134,8 +1213,15 @@ def main():
         'faiss_idx_to_coarse_id': faiss_idx_to_coarse_id,  # CRITICAL: Maps FAISS results to actual coarse IDs
         'num_coarse': len(coarse_graphs),
         'augmentor': augmentor,  # Pass augmentor for MAG (None for others)
-        'G_nx': to_networkx(data, to_undirected=True),  # For sibling_walk and multi_coarse
     }
+    
+    # Only build G_nx if needed (extremely slow for MAG's 1.9M nodes)
+    if any(qt in active_query_types for qt in ['sibling_walk', 'multi_coarse']):
+        print("[INFO] Building NetworkX graph (needed for sibling_walk/multi_coarse)...")
+        context['G_nx'] = to_networkx(data, to_undirected=True)
+    else:
+        print("[INFO] Skipping NetworkX graph construction (not needed for selected query types)")
+        context['G_nx'] = None
     
     # Build coarse_to_fine_map
     coarse_to_fine = defaultdict(list)
@@ -1146,7 +1232,7 @@ def main():
     # Run evaluation (with optional checkpointing)
     df = run_stratified_evaluation(
         encoder, context,
-        query_types=['k_hop', 'single', 'sibling_walk', 'multi_coarse'],  # All query types
+        query_types=active_query_types,
         queries_per_partition=args.queries_per_partition,
         target_queries_per_type=args.target_queries,
         top_k=args.top_k,
@@ -1163,7 +1249,9 @@ def main():
     df.to_csv(args.output, index=False)
     print(f"\n[INFO] Results saved to {args.output}")
     
-    print_evaluation_summary(df)
+    # Save summary text alongside CSV
+    summary_txt = args.output.replace('.csv', '_summary.txt')
+    print_evaluation_summary(df, output_txt=summary_txt)
 
 
 if __name__ == '__main__':

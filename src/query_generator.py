@@ -85,7 +85,7 @@ def _finalize_query_from_nodes(
     unique_global_nodes = sorted(list(set(global_nodes)))
     # Subgraph extraction
     temp_graph = original_data.subgraph(
-        torch.tensor(unique_global_nodes, device=device)
+        torch.tensor(unique_global_nodes, device=original_data.edge_index.device)
     )
     temp_nx = to_networkx(temp_graph, to_undirected=True)
 
@@ -106,7 +106,7 @@ def _finalize_query_from_nodes(
     final_global_nodes = [unique_global_nodes[i] for i in largest_cc_nodes]
     
     # Create final PyG object
-    Gq = original_data.subgraph(torch.tensor(final_global_nodes, device=device))
+    Gq = original_data.subgraph(torch.tensor(final_global_nodes, device=original_data.edge_index.device))
     return Gq, final_global_nodes
 
 
@@ -155,38 +155,40 @@ def generate_k_hop_query(
         if len(subset) < min_nodes:
             continue
         
-        # Store FULL k-hop neighborhood as target (before trimming)
-        full_khop_global_ids = subset.tolist()
+        # Cap both query and target using BFS from anchor (ensures connectivity)
+        MAX_TARGET_NODES = 10000
+        subset_list = subset.tolist()
+        anchor_pos = mapping.item() if mapping.numel() == 1 else 0
         
-        # Limit query to max_nodes via BFS from anchor
-        if len(subset) > max_nodes:
-            subset_list = subset.tolist()
-            anchor_pos = mapping.item() if mapping.numel() == 1 else 0
-            
-            # Build local graph for BFS
-            local_nx = nx.Graph()
-            local_nx.add_edges_from(edge_index.t().tolist())
-            
-            if local_nx.number_of_nodes() == 0:
-                continue
-            
-            # BFS to get max_nodes closest to anchor
-            visited = {anchor_pos}
-            queue = [anchor_pos]
-            while len(visited) < max_nodes and queue:
-                curr = queue.pop(0)
-                for neighbor in local_nx.neighbors(curr):
-                    if neighbor not in visited:
-                        visited.add(neighbor)
-                        queue.append(neighbor)
-                        if len(visited) >= max_nodes:
-                            break
-            
-            # Map back to global IDs for query
-            selected_local = list(visited)
-            query_global_ids = [subset_list[i] for i in selected_local if i < len(subset_list)]
-        else:
-            query_global_ids = subset.tolist()
+        # BFS using tensor-based neighbor lookup (no NetworkX needed)
+        from collections import deque
+        src = edge_index[0]
+        dst = edge_index[1]
+        
+        # Single BFS: collect up to MAX_TARGET_NODES for target, first max_nodes for query
+        visited_order = [anchor_pos]
+        visited_set = {anchor_pos}
+        queue = deque([anchor_pos])
+        target_limit = min(len(subset), MAX_TARGET_NODES)
+        
+        while len(visited_set) < target_limit and queue:
+            curr = queue.popleft()
+            neighbors = dst[src == curr].tolist()
+            neighbors += src[dst == curr].tolist()  # undirected
+            for n in neighbors:
+                if n not in visited_set:
+                    visited_set.add(n)
+                    visited_order.append(n)
+                    queue.append(n)
+                    if len(visited_set) >= target_limit:
+                        break
+        
+        # Query = first max_nodes BFS nodes, Target = all BFS nodes
+        query_local = visited_order[:max_nodes]
+        target_local = visited_order
+        
+        query_global_ids = [subset_list[i] for i in query_local if i < len(subset_list)]
+        full_khop_global_ids = [subset_list[i] for i in target_local if i < len(subset_list)]
         
         if len(query_global_ids) < min_nodes:
             continue
@@ -199,7 +201,7 @@ def generate_k_hop_query(
         if query_data is None:
             continue
         
-        # Create target subgraph (FULL k-hop neighborhood)
+        # Create target subgraph (capped k-hop neighborhood, connected via BFS)
         target_data, target_global_ids = _finalize_query_from_nodes(
             original_data, full_khop_global_ids, min_nodes, device
         )
@@ -350,7 +352,7 @@ def generate_multi_fine_partition_query(
                 node.item() for idx in q_fine_indices for node in fine_part_nodes_map[idx]
             ]
             G_stitched = kwargs["original_data"].subgraph(
-                torch.tensor(stitched_nodes, device=device)
+                torch.tensor(stitched_nodes, device='cpu')
             )
             return Gq, G_stitched, q_global_nodes, q_fine_indices, {true_coarse_idx}
 
@@ -467,7 +469,7 @@ def generate_multi_coarse_partition_query(
             
             if Gq:
                 stitched_nodes = [node.item() for idx in q_fine_indices for node in fine_part_nodes_map[idx]]
-                G_stitched = original_data.subgraph(torch.tensor(stitched_nodes, device=device))
+                G_stitched = original_data.subgraph(torch.tensor(stitched_nodes, device='cpu'))
                 return Gq, G_stitched, q_global_nodes, q_fine_indices, true_coarse_indices
                  
     return None
