@@ -249,14 +249,15 @@ def run_random_sampling_baseline(
     node_to_coarse_map: dict = None,
     sample_size: int = BASELINE_SAMPLE_SIZE,
     timeout_per_attempt: float = BASELINE_TIMEOUT_SECONDS,
-    max_retries: int = BASELINE_MAX_RETRIES
+    max_retries: int = BASELINE_MAX_RETRIES,
+    skip_vf2: bool = False
 ) -> Dict[str, Any]:
     """
-    K-hop expansion baseline for big graph search (SOTA approach).
+    K-hop expansion baseline for big graph search.
     
     Picks a random anchor, expands via k-hop, then:
-    1. Computes ground-truth metrics (node overlap, partition coverage) — NO VF2 needed
-    2. Optionally runs VF2 for isomorphism check
+    1. ALWAYS computes ground-truth metrics (node overlap, partition coverage)
+    2. Optionally runs VF2 for isomorphism check (skipped if skip_vf2=True)
     
     Tracks the BEST ground-truth metrics across all retry attempts.
     """
@@ -265,7 +266,6 @@ def run_random_sampling_baseline(
         'baseline_attempts': 0,
         'baseline_time': 0.0,
         'baseline_sample_size': sample_size,
-        'baseline_timeout_per_attempt': timeout_per_attempt,
         # Ground-truth metrics (best across all attempts)
         'baseline_node_precision': 0.0,
         'baseline_node_recall': 0.0,
@@ -320,7 +320,7 @@ def run_random_sampling_baseline(
                 continue
         
         # ============================================================
-        # Ground-truth metrics (computed BEFORE VF2, no solver needed)
+        # Ground-truth metrics (ALWAYS computed, no VF2 needed)
         # ============================================================
         sample_node_set = set(subset.tolist())
         
@@ -343,7 +343,8 @@ def run_random_sampling_baseline(
             gt_partition_recall = gt_covered / len(true_coarse_indices) if true_coarse_indices else 0
             all_gt_found = (gt_covered == len(true_coarse_indices))
         
-        print(f"      [Baseline] GT metrics: node_recall={node_recall*100:.1f}%, "
+        print(f"      [Baseline] Try {attempt+1}: sampled={len(sample_node_set)} nodes, "
+              f"node_recall={node_recall*100:.1f}%, "
               f"partition_recall={gt_partition_recall*100:.1f}%, "
               f"contains_query={contains_query}", flush=True)
         
@@ -357,38 +358,50 @@ def run_random_sampling_baseline(
             result['baseline_all_gt_found'] = all_gt_found
             result['baseline_contains_query'] = contains_query
         
-        # Build sampled subgraph
-        sampled_graph = _extract_subgraph(adj_t, subset, original_data)
-        
-        if sampled_graph is None or sampled_graph.num_nodes == 0:
-            print(f"      [Baseline] Skip: empty subgraph", flush=True)
-            continue
-        
-        print(f"      [Baseline] Searching {len(subset)} nodes (k={k}, timeout={timeout_per_attempt:.0f}s)...", flush=True)
-        
-        # Run VF2 on sampled subgraph
-        try:
-            vf2_result = vf2_verify_subgraph(
-                query_data, sampled_graph,
-                query_global_ids, subset,
-                timeout_seconds=timeout_per_attempt
-            )
-            
-            if vf2_result.found:
-                result['baseline_found'] = True
+        # If we already contain the full query, no need to keep trying
+        if contains_query:
+            print(f"      [Baseline] Found all query nodes on attempt {attempt+1}!", flush=True)
+            result['baseline_contains_query'] = True
+            if skip_vf2:
                 result['baseline_time'] = time.time() - total_start
-                result['baseline_solutions'] = vf2_result.num_solutions
-                result['baseline_k_hops'] = k
                 return result
-                
-        except Exception as e:
-            pass
         
-        # Check total time limit
-        if time.time() - total_start > max_retries * timeout_per_attempt:
-            break
+        # ============================================================
+        # VF2 verification (ONLY if not skipped)
+        # ============================================================
+        if not skip_vf2:
+            sampled_graph = _extract_subgraph(adj_t, subset, original_data)
+            
+            if sampled_graph is None or sampled_graph.num_nodes == 0:
+                print(f"      [Baseline] Skip VF2: empty subgraph", flush=True)
+                continue
+            
+            print(f"      [Baseline] VF2 on {len(subset)} nodes (k={k}, timeout={timeout_per_attempt:.0f}s)...", flush=True)
+            
+            try:
+                vf2_result = vf2_verify_subgraph(
+                    query_data, sampled_graph,
+                    query_global_ids, subset,
+                    timeout_seconds=timeout_per_attempt
+                )
+                
+                if vf2_result.found:
+                    result['baseline_found'] = True
+                    result['baseline_time'] = time.time() - total_start
+                    result['baseline_solutions'] = vf2_result.num_solutions
+                    result['baseline_k_hops'] = k
+                    return result
+                    
+            except Exception:
+                pass
+            
+            # Check total time limit for VF2 retries
+            if time.time() - total_start > max_retries * timeout_per_attempt:
+                break
     
     result['baseline_time'] = time.time() - total_start
+    print(f"      [Baseline] Done: best_node_recall={best_node_recall*100:.1f}% "
+          f"over {result['baseline_attempts']} attempts ({result['baseline_time']:.1f}s)", flush=True)
     return result
 
 
@@ -684,8 +697,8 @@ def search_and_verify(
         # Query stats
         result['query_nodes'] = len(query_global_ids) if query_global_ids is not None else 0
         
-        # 4b. Random Sampling Baseline (for big graphs)
-        if run_baseline and original_data is not None:
+        # 4b. Random Sampling Baseline — GT metrics ALWAYS run, VF2 is optional
+        if original_data is not None:
             baseline_result = run_random_sampling_baseline(
                 query_data, query_global_ids,
                 original_data, adj_t,
@@ -693,7 +706,8 @@ def search_and_verify(
                 node_to_coarse_map=context.get('node_to_coarse_map'),
                 sample_size=BASELINE_SAMPLE_SIZE,
                 timeout_per_attempt=BASELINE_TIMEOUT_SECONDS,
-                max_retries=BASELINE_MAX_RETRIES
+                max_retries=BASELINE_MAX_RETRIES,
+                skip_vf2=(skip_vf2 or not run_baseline)
             )
             result['vf2_baseline_found'] = baseline_result['baseline_found']
             result['vf2_baseline_time'] = baseline_result['baseline_time']
