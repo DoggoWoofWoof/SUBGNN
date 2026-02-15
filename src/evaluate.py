@@ -245,6 +245,8 @@ def run_random_sampling_baseline(
     query_global_ids: torch.Tensor,
     original_data: Data,
     adj_t: SparseTensor,
+    true_coarse_indices: set = None,
+    node_to_coarse_map: dict = None,
     sample_size: int = BASELINE_SAMPLE_SIZE,
     timeout_per_attempt: float = BASELINE_TIMEOUT_SECONDS,
     max_retries: int = BASELINE_MAX_RETRIES
@@ -252,34 +254,39 @@ def run_random_sampling_baseline(
     """
     K-hop expansion baseline for big graph search (SOTA approach).
     
-    Instead of searching the entire graph (infeasible for large graphs),
-    pick a random anchor and expand via k-hop to get ~sample_size connected nodes.
-    Run VF2 on this connected neighborhood. Retry with different anchors.
+    Picks a random anchor, expands via k-hop, then:
+    1. Computes ground-truth metrics (node overlap, partition coverage) — NO VF2 needed
+    2. Optionally runs VF2 for isomorphism check
     
-    This is the fair baseline for comparing FAISS-based search with brute-force.
-    
-    Args:
-        query_data: Query subgraph
-        query_global_ids: Global node IDs in query
-        original_data: Full graph
-        adj_t: Sparse adjacency tensor
-        sample_size: Target nodes per sample (via k-hop expansion)
-        timeout_per_attempt: Timeout in seconds per VF2 attempt
-        max_retries: Max number of random anchor attempts
-        
-    Returns:
-        Dict with found, total_time, attempts, etc.
+    Tracks the BEST ground-truth metrics across all retry attempts.
     """
     result = {
         'baseline_found': False,
         'baseline_attempts': 0,
         'baseline_time': 0.0,
         'baseline_sample_size': sample_size,
-        'baseline_timeout_per_attempt': timeout_per_attempt
+        'baseline_timeout_per_attempt': timeout_per_attempt,
+        # Ground-truth metrics (best across all attempts)
+        'baseline_node_precision': 0.0,
+        'baseline_node_recall': 0.0,
+        'baseline_node_f1': 0.0,
+        'baseline_gt_partition_recall': 0.0,
+        'baseline_all_gt_found': False,
+        'baseline_contains_query': False,
     }
     
     num_nodes = original_data.num_nodes
     total_start = time.time()
+    
+    # Prepare query node set for overlap computation
+    if hasattr(query_global_ids, 'tolist'):
+        query_node_set = set(query_global_ids.tolist())
+    elif isinstance(query_global_ids, list):
+        query_node_set = set(query_global_ids)
+    else:
+        query_node_set = set()
+    
+    best_node_recall = 0.0
     
     for attempt in range(max_retries):
         result['baseline_attempts'] = attempt + 1
@@ -290,6 +297,7 @@ def run_random_sampling_baseline(
         anchor = random.randint(0, num_nodes - 1)
         
         # Start with small k and increase until we hit target size
+        subset = torch.tensor([anchor])
         for k in range(1, 10):  # Max 10 hops
             try:
                 subset, _, _, _ = k_hop_subgraph(
@@ -301,18 +309,53 @@ def run_random_sampling_baseline(
                 )
                 
                 if len(subset) >= sample_size:
-                    # Trim to sample_size if too large
                     if len(subset) > sample_size:
-                        # Take closest nodes via BFS order (subset is already BFS-ordered)
                         subset = subset[:sample_size]
                     break
             except Exception:
                 continue
         else:
-            # Couldn't get enough nodes, use what we have
             if len(subset) < 10:
                 print(f"      [Baseline] Skip: too few nodes ({len(subset)})", flush=True)
-                continue  # Too small, try another anchor
+                continue
+        
+        # ============================================================
+        # Ground-truth metrics (computed BEFORE VF2, no solver needed)
+        # ============================================================
+        sample_node_set = set(subset.tolist())
+        
+        # Node-level overlap with query
+        intersection = sample_node_set & query_node_set
+        node_precision = len(intersection) / len(sample_node_set) if sample_node_set else 0
+        node_recall = len(intersection) / len(query_node_set) if query_node_set else 0
+        node_f1 = (2 * node_precision * node_recall / (node_precision + node_recall)) if (node_precision + node_recall) > 0 else 0
+        contains_query = query_node_set.issubset(sample_node_set)
+        
+        # Partition coverage
+        gt_partition_recall = 0.0
+        all_gt_found = False
+        if true_coarse_indices and node_to_coarse_map:
+            sample_coarse = set()
+            for nid in sample_node_set:
+                if nid in node_to_coarse_map:
+                    sample_coarse.add(node_to_coarse_map[nid])
+            gt_covered = sum(1 for gt in true_coarse_indices if gt in sample_coarse)
+            gt_partition_recall = gt_covered / len(true_coarse_indices) if true_coarse_indices else 0
+            all_gt_found = (gt_covered == len(true_coarse_indices))
+        
+        print(f"      [Baseline] GT metrics: node_recall={node_recall*100:.1f}%, "
+              f"partition_recall={gt_partition_recall*100:.1f}%, "
+              f"contains_query={contains_query}", flush=True)
+        
+        # Track BEST metrics across attempts
+        if node_recall > best_node_recall:
+            best_node_recall = node_recall
+            result['baseline_node_precision'] = node_precision
+            result['baseline_node_recall'] = node_recall
+            result['baseline_node_f1'] = node_f1
+            result['baseline_gt_partition_recall'] = gt_partition_recall
+            result['baseline_all_gt_found'] = all_gt_found
+            result['baseline_contains_query'] = contains_query
         
         # Build sampled subgraph
         sampled_graph = _extract_subgraph(adj_t, subset, original_data)
@@ -339,7 +382,6 @@ def run_random_sampling_baseline(
                 return result
                 
         except Exception as e:
-            # Timeout or other error, continue to next attempt
             pass
         
         # Check total time limit
@@ -647,6 +689,8 @@ def search_and_verify(
             baseline_result = run_random_sampling_baseline(
                 query_data, query_global_ids,
                 original_data, adj_t,
+                true_coarse_indices=true_coarse_indices,
+                node_to_coarse_map=context.get('node_to_coarse_map'),
                 sample_size=BASELINE_SAMPLE_SIZE,
                 timeout_per_attempt=BASELINE_TIMEOUT_SECONDS,
                 max_retries=BASELINE_MAX_RETRIES
@@ -655,6 +699,13 @@ def search_and_verify(
             result['vf2_baseline_time'] = baseline_result['baseline_time']
             result['vf2_baseline_attempts'] = baseline_result['baseline_attempts']
             result['vf2_baseline_sample_size'] = baseline_result['baseline_sample_size']
+            # Ground-truth metrics (best across all baseline attempts)
+            result['baseline_node_precision'] = baseline_result['baseline_node_precision']
+            result['baseline_node_recall'] = baseline_result['baseline_node_recall']
+            result['baseline_node_f1'] = baseline_result['baseline_node_f1']
+            result['baseline_gt_partition_recall'] = baseline_result['baseline_gt_partition_recall']
+            result['baseline_all_gt_found'] = baseline_result['baseline_all_gt_found']
+            result['baseline_contains_query'] = baseline_result['baseline_contains_query']
         
         result['vf2_time'] = time.time() - t_vf2
         
@@ -929,6 +980,16 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
                 vf2_base = successful[successful['vf2_baseline_found'].notna()]['vf2_baseline_found'].mean()*100
                 log(f"  VF2 Baseline Match:  {vf2_base:.1f}% (Full Graph)")
             
+            # Baseline ground-truth metrics (random sampling vs our FAISS)
+            if 'baseline_node_recall' in successful.columns and successful['baseline_node_recall'].notna().any():
+                bl = successful[successful['baseline_node_recall'].notna()]
+                log(f"  --- Baseline (Random Sampling) ---")
+                log(f"    Node Recall:       {bl['baseline_node_recall'].mean()*100:.1f}%")
+                log(f"    Node Precision:    {bl['baseline_node_precision'].mean()*100:.1f}%")
+                log(f"    Node F1:           {bl['baseline_node_f1'].mean()*100:.1f}%")
+                log(f"    GT Part. Recall:   {bl['baseline_gt_partition_recall'].mean()*100:.1f}%")
+                log(f"    Contains Query:    {bl['baseline_contains_query'].mean()*100:.1f}%")
+            
             if 'query_nodes' in successful.columns:
                 log(f"  Avg Query Nodes:     {successful['query_nodes'].mean():.0f}")
             if 'stitched_nodes' in successful.columns:
@@ -962,6 +1023,12 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             log(f"  Recall@20:           {all_successful['recall_at_20'].mean()*100:.1f}%")
         if 'vf2_stitched_found' in all_successful.columns:
             log(f"  VF2 Stitched Match:  {all_successful['vf2_stitched_found'].mean()*100:.1f}% (Our Method)")
+        if 'baseline_node_recall' in all_successful.columns and all_successful['baseline_node_recall'].notna().any():
+            bl = all_successful[all_successful['baseline_node_recall'].notna()]
+            log(f"  --- Baseline (Random Sampling) ---")
+            log(f"    Node Recall:       {bl['baseline_node_recall'].mean()*100:.1f}%")
+            log(f"    GT Part. Recall:   {bl['baseline_gt_partition_recall'].mean()*100:.1f}%")
+            log(f"    Contains Query:    {bl['baseline_contains_query'].mean()*100:.1f}%")
         if 'query_nodes' in all_successful.columns:
             log(f"  Avg Query Nodes:     {all_successful['query_nodes'].mean():.0f}")
         if 'stitched_nodes' in all_successful.columns:
