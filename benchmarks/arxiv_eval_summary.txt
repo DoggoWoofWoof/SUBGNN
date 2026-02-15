@@ -6,90 +6,122 @@ EVALUATION SUMMARY
 --- K_HOP ---
   Total queries:       100
   Successful:          100
-  Coarse Recall@1:     96.0%
-  Coarse Recall@K:     99.0%
-  GT Partition Recall: 40.0%
-  All GT Parts Found:  2.0%
-  Recall@1:            7.1%
-  Recall@5:            22.3%
-  Recall@20:           39.7%
+  Coarse Recall@1:     99.0%
+  Coarse Recall@K:     100.0%
+  GT Partition Recall: 39.1%
+  All GT Parts Found:  3.0%
+  Recall@1:            8.0%
+  Recall@5:            21.2%
+  Recall@20:           39.1%
   VF2 Stitched Match:  0.0% (Our Method)
-  Avg Query Nodes:     93
-  Avg Stitched Nodes:  21026
+  VF2 Baseline Match:  0.0% (Full Graph)
+  --- Baseline (Random Sampling) ---
+    Node Recall:       41.5%
+    Node Precision:    0.4%
+    Node F1:           0.8%
+    GT Part. Recall:   96.2%
+    Contains Query:    0.0%
+  Avg Query Nodes:     96
+  Avg Stitched Nodes:  21052
   Avg Partitions:      21.0
-  Avg Latency:         122.9ms
-    - Embedding:       6.0ms
+  Avg Latency:         1161.3ms
+    - Embedding:       7.1ms
     - FAISS:           0.3ms
-    - VF2:             47.6ms
+    - VF2:             1087.9ms
 
 --- SINGLE ---
   Total queries:       100
   Successful:          100
-  Coarse Recall@1:     87.0%
+  Coarse Recall@1:     86.0%
   Coarse Recall@K:     99.0%
   GT Partition Recall: 99.0%
   All GT Parts Found:  99.0%
-  Recall@1:            87.0%
+  Recall@1:            86.0%
   Recall@5:            98.0%
   Recall@20:           99.0%
   VF2 Stitched Match:  0.0% (Our Method)
-  Avg Query Nodes:     58
-  Avg Stitched Nodes:  20957
+  VF2 Baseline Match:  0.0% (Full Graph)
+  --- Baseline (Random Sampling) ---
+    Node Recall:       15.9%
+    Node Precision:    0.1%
+    Node F1:           0.2%
+    GT Part. Recall:   90.0%
+    Contains Query:    0.0%
+  Avg Query Nodes:     55
+  Avg Stitched Nodes:  20932
   Avg Partitions:      21.0
-  Avg Latency:         111.4ms
-    - Embedding:       5.8ms
+  Avg Latency:         1100.5ms
+    - Embedding:       6.6ms
     - FAISS:           0.3ms
-    - VF2:             40.3ms
+    - VF2:             1031.0ms
 
 --- SIBLING_WALK ---
   Total queries:       100
   Successful:          100
-  Coarse Recall@1:     92.0%
-  Coarse Recall@K:     100.0%
-  GT Partition Recall: 100.0%
-  All GT Parts Found:  100.0%
-  Recall@1:            92.0%
-  Recall@5:            100.0%
-  Recall@20:           100.0%
+  Coarse Recall@1:     94.0%
+  Coarse Recall@K:     98.0%
+  GT Partition Recall: 98.0%
+  All GT Parts Found:  98.0%
+  Recall@1:            94.0%
+  Recall@5:            98.0%
+  Recall@20:           98.0%
   VF2 Stitched Match:  0.0% (Our Method)
-  Avg Query Nodes:     85
-  Avg Stitched Nodes:  20973
+  VF2 Baseline Match:  0.0% (Full Graph)
+  --- Baseline (Random Sampling) ---
+    Node Recall:       19.8%
+    Node Precision:    0.2%
+    Node F1:           0.3%
+    GT Part. Recall:   95.0%
+    Contains Query:    0.0%
+  Avg Query Nodes:     87
+  Avg Stitched Nodes:  20993
   Avg Partitions:      21.0
-  Avg Latency:         120.0ms
-    - Embedding:       5.9ms
+  Avg Latency:         1152.4ms
+    - Embedding:       6.7ms
     - FAISS:           0.3ms
-    - VF2:             52.3ms
+    - VF2:             1083.7ms
 
 --- MULTI_COARSE ---
   Total queries:       100
   Successful:          100
-  Coarse Recall@1:     88.0%
-  Coarse Recall@K:     100.0%
-  GT Partition Recall: 77.0%
-  All GT Parts Found:  54.0%
-  Recall@1:            44.0%
-  Recall@5:            71.0%
-  Recall@20:           77.0%
+  Coarse Recall@1:     83.0%
+  Coarse Recall@K:     99.0%
+  GT Partition Recall: 51.3%
+  All GT Parts Found:  6.0%
+  Recall@1:            17.5%
+  Recall@5:            38.9%
+  Recall@20:           50.4%
   VF2 Stitched Match:  0.0% (Our Method)
-  Avg Query Nodes:     72
-  Avg Stitched Nodes:  20917
+  VF2 Baseline Match:  0.0% (Full Graph)
+  --- Baseline (Random Sampling) ---
+    Node Recall:       23.8%
+    Node Precision:    0.1%
+    Node F1:           0.2%
+    GT Part. Recall:   95.2%
+    Contains Query:    0.0%
+  Avg Query Nodes:     45
+  Avg Stitched Nodes:  20951
   Avg Partitions:      21.0
-  Avg Latency:         107.5ms
-    - Embedding:       5.9ms
+  Avg Latency:         1093.7ms
+    - Embedding:       6.5ms
     - FAISS:           0.3ms
-    - VF2:             43.7ms
+    - VF2:             1027.9ms
 
 --- OVERALL ---
   Total queries:       400
   Successful:          400
-  Coarse Recall@1:     90.8%
-  Coarse Recall@K:     99.5%
-  GT Partition Recall: 79.0%
-  All GT Parts Found:  63.7%
-  Recall@1:            57.5%
-  Recall@5:            72.8%
-  Recall@20:           78.9%
+  Coarse Recall@1:     90.5%
+  Coarse Recall@K:     99.0%
+  GT Partition Recall: 71.9%
+  All GT Parts Found:  51.5%
+  Recall@1:            51.4%
+  Recall@5:            64.0%
+  Recall@20:           71.6%
   VF2 Stitched Match:  0.0% (Our Method)
-  Avg Query Nodes:     77
-  Avg Stitched Nodes:  20968
-  Avg Latency:         115.4ms
+  --- Baseline (Random Sampling) ---
+    Node Recall:       25.3%
+    GT Part. Recall:   94.1%
+    Contains Query:    0.0%
+  Avg Query Nodes:     71
+  Avg Stitched Nodes:  20982
+  Avg Latency:         1126.9ms

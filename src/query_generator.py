@@ -405,7 +405,9 @@ def generate_multi_coarse_partition_query(
         return None
     random.shuffle(possible_edges)
 
-    for num_frags, min_coarse_parts in MULTI_COARSE_CONFIGS:
+    configs = list(MULTI_COARSE_CONFIGS)
+    random.shuffle(configs)
+    for num_frags, min_coarse_parts in configs:
         for c_idx1, c_idx2 in possible_edges[:10]:
             
             fine_parts_in_c1 = coarse_to_fine_map.get(c_idx1, [])
