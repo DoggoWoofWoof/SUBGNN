@@ -2,7 +2,7 @@
 Jigsaw GNN Evaluation Framework
 
 Stratified partition evaluation with multiple query types and comprehensive metrics.
-Uses VF2 (NetworkX) for subgraph isomorphism verification.
+Uses pluggable solvers (VF3, DP-iso, CFL, TurboISO) for subgraph isomorphism verification.
 """
 
 import os
@@ -31,7 +31,7 @@ from src.config import (
     TARGET_QUERIES_PER_TYPE
 )
 from src.model import ImprovedSubgraphEncoder, get_graph_embedding
-from src.vf2_matcher import vf2_verify_subgraph, MatchResult
+from src.solver_registry import run_solver, get_available_solvers, MatchResult
 from src.query_generator import (
     generate_k_hop_query,
     generate_single_partition_query,
@@ -418,18 +418,18 @@ def search_and_verify(
     encoder: ImprovedSubgraphEncoder,
     device: torch.device,
     top_k: int = 20,  # Changed from 5 to 20 for full partition coverage
-    vf2_timeout: float = 30.0,
+    solver_timeout: float = 300.0,
     ground_truth_target: Optional[Data] = None,  # Stitched ground truth target
-    run_baseline: bool = False,  # Whether to run VF2 on full graph (SLOW)
-    skip_vf2: bool = False  # Skip VF2 verification for faster testing
+    run_baseline: bool = False,  # Whether to run random sampling baseline
+    skip_solver: bool = False,  # Skip solver verification for faster testing
+    solver_name: str = 'vf3',  # Which solver to use
+    run_full_graph: bool = False,  # Run solver on the full graph
 ) -> Dict[str, Any]:
     """
-    Full search pipeline: embed -> FAISS search -> VF2 verify.
+    Full search pipeline: embed -> FAISS search -> solver verify.
     
-    VF2 Comparisons:
-    1. vf2_predicted: Query vs predicted coarse partition (our method)
-    2. vf2_ground_truth: Query vs stitched ground truth target
-    3. vf2_baseline: Query vs full graph (optional, very slow)
+    Solver verification compares query vs stitched partition subgraph
+    using the selected solver (vf3, dpiso, cfl, turboiso).
     
     Returns:
         Dict with all timing and accuracy metrics
@@ -548,8 +548,8 @@ def search_and_verify(
         #     Step 2: If fail, expand to top-5 neighbors  
         #     Step 3: If still fail, expand to top-20
         # ================================================================
-        print("      [S&V] Step 4: Iterative VF2...", flush=True)
-        t_vf2 = time.time()
+        print("      [S&V] Step 4: Iterative solver...", flush=True)
+        t_solver = time.time()
         
         coarse_part_nodes_map = context['coarse_part_nodes_map']
         coarse_part_graph = context.get('coarse_part_graph')
@@ -571,23 +571,31 @@ def search_and_verify(
         result['recall_at_5'] = rec5
         result['recall_at_20'] = rec20
         
-        # VF2 Configuration: 3 expansion levels, 60s per level (180s total = 3 min)
-        # Note: final_stitched_indices will be set to faiss_top20 as fallback AFTER VF2 attempts
-        vf2_found = False
-        vf2_solutions = 0
-        vf2_time = 0.0
+        # Solver Configuration: 3 expansion levels, 300s per level
+        # Note: final_stitched_indices will be set to faiss_top20 as fallback
+        solver_found = False
+        solver_solutions = 0
+        solver_time = 0.0
+        solver_timed_out = False
+        solver_first_acc = -1.0
+        solver_best_acc = -1.0
+        solver_avg_acc = -1.0
+        solver_median_acc = -1.0
+        solver_avg_nodes = -1.0
+        solver_median_nodes = -1.0
         stitched_nodes_count = 0
-        final_stitched_indices = faiss_top20[:20]  # Fallback to FAISS if VF2 fails
-        vf2_level_reached = "none"  # Track which level VF2 succeeded/failed at
+        final_stitched_indices = faiss_top20[:20]  # Fallback to FAISS if solver fails
+        solver_level_reached = "none"  # Track which level solver succeeded/failed at
         
         # Define expansion levels: (num_partitions, description)
-        # Note: VF2 call is skipped inside the loop if skip_vf2=True
+        # Note: solver call is skipped inside the loop if skip_solver=True
         expansion_levels = [
             (1, "top-1"),
             (5, "top-5"),
             (20, "top-20"),
         ]
         
+        t_stitch = time.time()
         for max_parts, level_name in expansion_levels:
             # Build stitched indices for this level
             if coarse_part_graph is not None:
@@ -645,39 +653,61 @@ def search_and_verify(
             
             stitched_global_ids = stitched_graph.global_id if hasattr(stitched_graph, 'global_id') else stitched_nodes
             
-            # Update stitching metrics (always computed, regardless of skip_vf2)
+            # Update stitching metrics (always computed, regardless of skip_solver)
             stitched_nodes_count = len(stitched_nodes)
             final_stitched_indices = stitched_coarse_indices
-            vf2_level_reached = level_name  # Track which level we're at
+            solver_level_reached = level_name  # Track which level we're at
             
-            # VF2 on this level (skip if skip_vf2 is True)
-            if skip_vf2:
-                print(f"      [S&V] Expansion {level_name}: Q={query_data.num_nodes}, S={stitched_graph.num_nodes} nodes (VF2 skipped)", flush=True)
-                # Don't run VF2, just continue to next level to get max stitching
+            # Solver on this level (skip if skip_solver is True)
+            if skip_solver:
+                print(f"      [S&V] Expansion {level_name}: Q={query_data.num_nodes}, S={stitched_graph.num_nodes} nodes (solver skipped)", flush=True)
+                # Don't run solver, just continue to next level to get max stitching
             else:
-                level_timeout = 60.0  # 60s per level = 3 min total across 3 levels
-                print(f"      [S&V] VF2 {level_name}: Q={query_data.num_nodes}, S={stitched_graph.num_nodes} nodes...", flush=True)
+                level_timeout = 300.0  # 5 min per level
+                print(f"      [S&V] {solver_name} {level_name}: Q={query_data.num_nodes}, S={stitched_graph.num_nodes} nodes...", flush=True)
                 
-                vf2_result = vf2_verify_subgraph(
-                    query_data, stitched_graph,
-                    query_global_ids, stitched_global_ids,
-                    timeout_seconds=level_timeout
+                solver_result = run_solver(
+                    solver_name,
+                    query_data=query_data,
+                    target_data=stitched_graph,
+                    query_global_ids=query_global_ids,
+                    target_global_ids=stitched_global_ids,
+                    max_solutions=100,
+                    timeout_seconds=level_timeout,
                 )
                 
-                vf2_time += vf2_result.latency_seconds
+                solver_time += solver_result.latency_seconds
                 
-                if vf2_result.found:
-                    vf2_found = True
-                    vf2_solutions = vf2_result.num_solutions
-                    print(f"      [S&V] VF2 {level_name}: FOUND! ({vf2_result.latency_seconds:.1f}s)", flush=True)
+                if solver_result.found:
+                    solver_found = True
+                    solver_solutions = solver_result.num_solutions
+                    solver_timed_out = solver_result.timed_out
+                    solver_first_acc = solver_result.first_solution_accuracy
+                    solver_best_acc = solver_result.best_accuracy
+                    solver_avg_acc = solver_result.avg_accuracy
+                    solver_median_acc = solver_result.median_accuracy
+                    solver_avg_nodes = solver_result.avg_nodes_matched
+                    solver_median_nodes = solver_result.median_nodes_matched
+                    print(f"      [S&V] {solver_name} {level_name}: FOUND {solver_solutions} solutions, best_acc={solver_best_acc:.1f}% ({solver_result.latency_seconds:.1f}s)", flush=True)
                     break
                 else:
-                    print(f"      [S&V] VF2 {level_name}: not found ({vf2_result.latency_seconds:.1f}s), expanding...", flush=True)
+                    solver_timed_out = solver_result.timed_out
+                    status = 'TIMEOUT' if solver_timed_out else 'not found'
+                    print(f"      [S&V] {solver_name} {level_name}: {status} ({solver_result.latency_seconds:.1f}s), expanding...", flush=True)
         
-        result['vf2_stitched_found'] = vf2_found
-        result['vf2_stitched_solutions'] = vf2_solutions
-        result['vf2_stitched_time'] = vf2_time
-        result['vf2_level_reached'] = vf2_level_reached  # Which expansion level VF2 stopped at
+        result['stitching_time'] = time.time() - t_stitch - solver_time  # pure stitching time
+        result['solver_name'] = solver_name
+        result['solver_found'] = solver_found
+        result['solver_solutions'] = solver_solutions
+        result['solver_timed_out'] = solver_timed_out
+        result['solver_first_accuracy'] = solver_first_acc
+        result['solver_best_accuracy'] = solver_best_acc
+        result['solver_avg_accuracy'] = solver_avg_acc
+        result['solver_median_accuracy'] = solver_median_acc
+        result['solver_avg_nodes_matched'] = solver_avg_nodes
+        result['solver_median_nodes_matched'] = solver_median_nodes
+        result['solver_time'] = solver_time
+        result['solver_level_reached'] = solver_level_reached
         result['stitched_nodes'] = stitched_nodes_count
         result['stitched_partitions'] = final_stitched_indices
         result['num_stitched'] = len(final_stitched_indices)
@@ -707,7 +737,7 @@ def search_and_verify(
                 sample_size=BASELINE_SAMPLE_SIZE,
                 timeout_per_attempt=BASELINE_TIMEOUT_SECONDS,
                 max_retries=BASELINE_MAX_RETRIES,
-                skip_vf2=(skip_vf2 or not run_baseline)
+                skip_vf2=(skip_solver or not run_baseline)
             )
             result['vf2_baseline_found'] = baseline_result['baseline_found']
             result['vf2_baseline_time'] = baseline_result['baseline_time']
@@ -721,7 +751,37 @@ def search_and_verify(
             result['baseline_all_gt_found'] = baseline_result['baseline_all_gt_found']
             result['baseline_contains_query'] = baseline_result['baseline_contains_query']
         
-        result['vf2_time'] = time.time() - t_vf2
+        result['solver_total_time'] = time.time() - t_solver
+        
+        # 4c. Full Graph Solver Run (optional, SLOW)
+        if run_full_graph and not skip_solver and original_data is not None:
+            print(f"      [S&V] Step 4c: Running {solver_name} on FULL GRAPH ({original_data.num_nodes} nodes)...", flush=True)
+            t_full = time.time()
+            
+            # Build full graph target
+            full_graph_gids = torch.arange(original_data.num_nodes)
+            
+            full_graph_result = run_solver(
+                solver_name,
+                query_data=query_data,
+                target_data=original_data,
+                query_global_ids=query_global_ids,
+                target_global_ids=full_graph_gids,
+                max_solutions=100,
+                timeout_seconds=300.0,  # 5 min for full graph
+            )
+            
+            result['full_graph_solver_found'] = full_graph_result.found
+            result['full_graph_solver_timed_out'] = full_graph_result.timed_out
+            result['full_graph_solver_solutions'] = full_graph_result.num_solutions
+            result['full_graph_solver_first_accuracy'] = full_graph_result.first_solution_accuracy
+            result['full_graph_solver_best_accuracy'] = full_graph_result.best_accuracy
+            result['full_graph_solver_avg_accuracy'] = full_graph_result.avg_accuracy
+            result['full_graph_solver_time'] = full_graph_result.latency_seconds
+            result['full_graph_total_time'] = time.time() - t_full
+            
+            fg_status = 'FOUND' if full_graph_result.found else ('TIMEOUT' if full_graph_result.timed_out else 'NOT FOUND')
+            print(f"      [S&V] Full graph: {fg_status}, {full_graph_result.num_solutions} sols, best_acc={full_graph_result.best_accuracy:.1f}% ({full_graph_result.latency_seconds:.1f}s)", flush=True)
         
         # 5. Compute precision/recall/F1 (stitched partition nodes vs query nodes)
         # Note: stitched_nodes are the nodes from FAISS-predicted partitions
@@ -774,12 +834,14 @@ def run_stratified_evaluation(
     context: Dict[str, Any],
     query_types: List[str] = ['k_hop', 'single', 'multi_coarse'],
     queries_per_partition: int = None,  # If None, auto-calculate from target
-    target_queries_per_type: int = TARGET_QUERIES_PER_TYPE,  # Total queries per type
+    target_queries_per_type: int = 10,  # Total queries per type
     top_k: int = 5,
     device: torch.device = None,
     checkpoint_path: str = None,
     run_baseline: bool = False,  # Whether to run k-hop baseline comparison
-    skip_vf2: bool = False  # Skip VF2 verification for faster testing
+    skip_solver: bool = False,  # Skip solver verification for faster testing
+    solver_name: str = 'vf3',  # Which solver to use
+    run_full_graph: bool = False,  # Run solver on full graph (SLOW)
 ) -> pd.DataFrame:
     """
     Run stratified evaluation across all coarse partitions.
@@ -899,8 +961,10 @@ def run_stratified_evaluation(
                         query_data, query_global_ids, true_coarse,
                         context, encoder, device, top_k,
                         ground_truth_target=target_data,
-                        run_baseline=run_baseline,  # Run k-hop baseline if enabled
-                        skip_vf2=skip_vf2  # Skip VF2 if enabled
+                        run_baseline=run_baseline,
+                        skip_solver=skip_solver,
+                        solver_name=solver_name,
+                        run_full_graph=run_full_graph,
                     )
                     print(f"    [P{anchor_coarse_idx}][Q{i}] search_and_verify done (success={result.get('success', False)})", flush=True)
                     
@@ -908,18 +972,18 @@ def run_stratified_evaluation(
                     result['anchor_coarse'] = anchor_coarse_idx
                     result['query_id'] = f"{query_type}_{anchor_coarse_idx}_{i}"
                     
-                    # Useful logging: query size, stitched size, recall, VF2 results
+                    # Useful logging: query size, stitched size, recall, solver results
                     q_nodes = result.get('query_nodes', 0)
                     stitched = result.get('stitched_nodes', 0)
-                    faiss_found = "✓" if result.get('vf2_stitched_found', False) else "✗"
+                    solver_ok = "\u2713" if result.get('solver_found', False) else "\u2717"
                     recall = result.get('gt_partition_recall', 0) * 100
                     
                     # Build log string
-                    log_str = f"    [P{anchor_coarse_idx}][Q{i}] Q:{q_nodes} → Stitch:{stitched} (rec:{recall:.0f}%) FAISS:{faiss_found}"
+                    log_str = f"    [P{anchor_coarse_idx}][Q{i}] Q:{q_nodes} -> Stitch:{stitched} (rec:{recall:.0f}%) Solver:{solver_ok}"
                     
                     # Add baseline result if enabled
                     if 'vf2_baseline_found' in result:
-                        baseline_found = "✓" if result.get('vf2_baseline_found', False) else "✗"
+                        baseline_found = "\u2713" if result.get('vf2_baseline_found', False) else "\u2717"
                         baseline_tries = result.get('vf2_baseline_attempts', 0)
                         log_str += f" | Baseline:{baseline_found}({baseline_tries}tries)"
                     
@@ -1122,8 +1186,8 @@ def main():
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--queries_per_partition', type=int, default=None,
                         help='Queries per partition (if None, auto-calc from --target_queries)')
-    parser.add_argument('--target_queries', type=int, default=TARGET_QUERIES_PER_TYPE,
-                        help='Target total queries per query type (default: 100)')
+    parser.add_argument('--target_queries', type=int, default=10,
+                        help='Target total queries per query type (default: 10)')
     parser.add_argument('--top_k', type=int, default=5)
     parser.add_argument('--output', type=str, default='evaluation_results.csv')
     parser.add_argument('--hierarchy_cache', type=str, default=None,
@@ -1132,8 +1196,13 @@ def main():
                         help='Path to checkpoint JSON for resumability')
     parser.add_argument('--run_baseline', action='store_true',
                         help='Run k-hop random sampling baseline (SLOW, for comparison)')
-    parser.add_argument('--skip_vf2', action='store_true',
-                        help='Skip VF2 verification (faster, only FAISS metrics)')
+    parser.add_argument('--skip_solver', action='store_true',
+                        help='Skip solver verification (faster, only FAISS + GT metrics)')
+    parser.add_argument('--solver', type=str, default='vf3',
+                        choices=['vf3', 'dpiso', 'cfl', 'turboiso', 'all'],
+                        help='Subgraph isomorphism solver to use (default: vf3)')
+    parser.add_argument('--run_full_graph', action='store_true',
+                        help='Run solver on the full graph for each query (SLOW)')
     parser.add_argument('--query_types', type=str, default=None,
                         help='Comma-separated query types to run (e.g. single,multi_coarse). Default: all')
     
@@ -1320,7 +1389,9 @@ def main():
         device=DEVICE,
         checkpoint_path=args.checkpoint,
         run_baseline=args.run_baseline,
-        skip_vf2=args.skip_vf2
+        skip_solver=args.skip_solver,
+        solver_name=args.solver,
+        run_full_graph=args.run_full_graph,
     )
     
     # Add summary statistics (median, avg) per query type

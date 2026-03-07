@@ -34,6 +34,7 @@ volume = modal.Volume.from_name("gnn-data-volume", create_if_missing=True)
 # Define the container image with all dependencies
 image = (
     modal.Image.debian_slim(python_version="3.11")
+    .apt_install("git", "cmake", "build-essential")  # For SubgraphMatching build
     .pip_install(
         "torch==2.1.2",
         "numpy<2.0.0",  # Pin numpy for compatibility
@@ -48,9 +49,21 @@ image = (
         "scipy",
         "networkx",
         "matplotlib",
-        "faiss-cpu>=1.7.4", # Keep faiss-cpu
-        "pandas>=2.0.0", # Keep pandas
-        "tqdm>=4.65.0", # Keep tqdm
+        "faiss-cpu>=1.7.4",
+        "pandas>=2.0.0",
+        "tqdm>=4.65.0",
+        "vf3py",  # VF3 subgraph isomorphism solver
+    )
+    # Build SubgraphMatching binary (DP-iso, CFL, TurboISO)
+    .run_commands(
+        "git clone https://github.com/RapidsAtHKUST/SubgraphMatching.git /app/SubgraphMatching",
+        # Patch config.h: SI 2 = scalar (no AVX2), HYBRID 1 = merge-based (no AVX2 galloping), enable failing set
+        "sed -i 's/#define SI 0/#define SI 2/' /app/SubgraphMatching/configuration/config.h",
+        "sed -i 's/#define HYBRID 0/#define HYBRID 1/' /app/SubgraphMatching/configuration/config.h",
+        "sed -i 's|// #define ENABLE_FAILING_SET|#define ENABLE_FAILING_SET|' /app/SubgraphMatching/configuration/config.h",
+        # Remove -march=native, use x86-64-v2 for portability (SSE4.2 but no AVX2)
+        "sed -i 's/-march=native/-march=x86-64-v2/' /app/SubgraphMatching/CMakeLists.txt",
+        "cd /app/SubgraphMatching && mkdir -p build && cd build && cmake .. && make -j$(nproc)",
     )
 )
 
@@ -119,11 +132,13 @@ def upload_models():
 )
 def run_evaluation(
     dataset: str = "cora",
-    target_queries: int = 100,
+    target_queries: int = 10,
     top_k: int = 20,
-    skip_vf2: bool = False,
+    skip_solver: bool = False,
     run_baseline: bool = False,
     query_types: str = None,
+    solver: str = 'vf3',
+    run_full_graph: bool = False,
 ):
     """
     Run src.evaluate on Modal with the corrected evaluation code.
@@ -163,12 +178,16 @@ def run_evaluation(
     else:
         print(f"ℹ No hierarchy cache — will build and save to {hierarchy_path}")
 
-    if skip_vf2:
-        cmd.append("--skip_vf2")
+    if skip_solver:
+        cmd.append("--skip_solver")
     if run_baseline:
         cmd.append("--run_baseline")
     if query_types:
         cmd.extend(["--query_types", query_types])
+    if solver:
+        cmd.extend(["--solver", solver])
+    if run_full_graph:
+        cmd.append("--run_full_graph")
 
     print(f"\n🚀 Running: {' '.join(cmd)}\n")
 
@@ -205,13 +224,15 @@ def download_result(dataset: str = "cora", filename: str = None):
 @app.local_entrypoint()
 def main(
     dataset: str = "all",
-    target_queries: int = 100,
+    target_queries: int = 10,
     top_k: int = 20,
-    skip_vf2: bool = False,
+    skip_solver: bool = False,
     run_baseline: bool = False,
     setup_only: bool = False,
     download: bool = False,
     query_types: str = None,
+    solver: str = 'vf3',
+    run_full_graph: bool = False,
 ):
     """
     End-to-end Modal CLI entrypoint.
@@ -264,8 +285,10 @@ def main(
     print(f"  Datasets     : {', '.join(datasets)}")
     print(f"  Queries/type : {target_queries}")
     print(f"  Top-k        : {top_k}")
-    print(f"  Skip VF2     : {skip_vf2}")
+    print(f"  Skip Solver  : {skip_solver}")
+    print(f"  Solver       : {solver}")
     print(f"  Baseline     : {run_baseline}")
+    print(f"  Full Graph   : {run_full_graph}")
     print(f"  Query Types  : {query_types or 'all'}")
     print("=" * 60)
 
@@ -285,9 +308,11 @@ def main(
             dataset=ds,
             target_queries=target_queries,
             top_k=top_k,
-            skip_vf2=skip_vf2,
+            skip_solver=skip_solver,
             run_baseline=run_baseline,
             query_types=query_types,
+            solver=solver,
+            run_full_graph=run_full_graph,
         )
         results[ds] = exit_code
         if exit_code == 0:
