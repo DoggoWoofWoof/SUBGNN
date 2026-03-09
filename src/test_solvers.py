@@ -5,7 +5,7 @@ Constructs a small, known graph and query subgraph, then runs each solver
 to confirm it can find the subgraph and compute correct accuracy.
 
 Usage:
-    python -m src.test_solvers          # Run locally (VF3 needs Linux)
+    python -m src.test_solvers          # Run locally
     # Or on Modal for full testing
 """
 
@@ -114,7 +114,7 @@ def main():
     available = get_available_solvers()
     print(f"\nAvailable solvers: {available}")
 
-    all_solvers = ['vf3', 'dpiso', 'cfl', 'turboiso']
+    all_solvers = ['dpiso', 'cfl', 'turboiso']
     results = {}
 
     for solver_name in all_solvers:

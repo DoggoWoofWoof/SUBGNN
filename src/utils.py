@@ -8,55 +8,42 @@ from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 from torch_geometric.utils import to_networkx
 
-def feature_to_label(vector: np.ndarray) -> str:
+_feature_hash_to_contiguous = {}
+_next_contiguous_id = 0
+
+def feature_to_label(vector: np.ndarray) -> int:
     """
-    Converts a node feature vector to a SHA256 hash string.
-    This discretizes continuous features for the Glasgow Subgraph Solver.
+    Converts a node feature vector to a stable contiguous integer ID.
+    This discretizes continuous features for Subgraph Isomorphism solvers
+    and prevents large array allocations in C++ binaries.
     """
-    # Sanity check: if vector is float and not binary, this might be unstable.
-    # We assume features are effectively categorical or binary for hashing to make sense.
-    # For floats, we might need rounding, but for now using strict equality via string repr of indices.
-    
+    global _feature_hash_to_contiguous, _next_contiguous_id
+    if vector is None:
+        return 0
+        
+    import torch
+    if isinstance(vector, torch.Tensor):
+        vector = vector.detach().cpu().numpy()
+        
     # Check if sparse (binary) or dense
     if np.all(np.isin(vector, [0, 1])):
         indices = np.where(vector == 1)[0]
-        index_str = "_".join(map(str, indices))
+        feats_tuple = tuple(indices.tolist())
     else:
         # Fallback for dense float features (Arxiv/MAG embeddings)
         # Rounding to 4 decimals to avoid float precision jitter
         vector_rounded = np.round(vector, 4)
-        index_str = ",".join(map(str, vector_rounded))
+        feats_tuple = tuple(vector_rounded.tolist())
         
-    hash_str = hashlib.sha256(index_str.encode("utf-8")).hexdigest()
-    return hash_str
+    h = hash(feats_tuple)
+    if h not in _feature_hash_to_contiguous:
+        _feature_hash_to_contiguous[h] = _next_contiguous_id
+        _next_contiguous_id += 1
+    
+    # Cap to 0..63 because SubgraphMatching C++ uses std::bitset<64>
+    return _feature_hash_to_contiguous[h] % 64
 
-def convert_graph_to_csv(
-    data: Data,
-    filename: str,
-    global_id_to_label_feature: Dict[int, str],
-    local_to_global_map: Dict[int, int],
-):
-    """
-    Exports a PyG Data object to the CSV format required by Glasgow Solver.
-    """
-    edge_index = data.edge_index.cpu().numpy()
-    if edge_index.shape[1] == 0:
-        # Handle empty graph case if needed
-        pd.DataFrame(columns=[0, 1]).to_csv(filename, header=False, index=False, mode="w")
-    else:
-        edge_data = edge_index.T
-        edges_df = pd.DataFrame(edge_data)
-        edges_df.to_csv(filename, header=False, index=False, mode="w")
 
-    node_label_list = []
-    for i in range(data.num_nodes):
-        global_id = local_to_global_map[i]
-        label = global_id_to_label_feature.get(global_id, "unknown")
-        # Format: ID, Label, Domain-Label (we use hash for domain label)
-        node_label_list.append([i, "", label])
-        
-    node_labels_df = pd.DataFrame(node_label_list)
-    node_labels_df.to_csv(filename, header=False, index=False, mode="a")
 
 def are_partitions_neighbors(
     G_nx: nx.Graph, nodes_a: List[int], nodes_b: List[int]

@@ -64,8 +64,10 @@ def compute_mapping_accuracy(
 
     for q_local, t_local in mapping.items():
         try:
-            q_global = query_global_ids[q_local].item()
-            t_global = target_global_ids[t_local].item()
+            q_val = query_global_ids[q_local]
+            t_val = target_global_ids[t_local]
+            q_global = q_val.item() if hasattr(q_val, 'item') else int(q_val)
+            t_global = t_val.item() if hasattr(t_val, 'item') else int(t_val)
             if q_global == t_global:
                 correct += 1
         except (IndexError, KeyError):
@@ -169,12 +171,6 @@ def run_solver(
 
 def _register_all():
     """Register all available solvers."""
-    try:
-        from src.vf3_solver import vf3_solve
-        register_solver('vf3', vf3_solve)
-    except ImportError:
-        pass
-
     try:
         from src.subgraph_matching_solver import make_solver
 

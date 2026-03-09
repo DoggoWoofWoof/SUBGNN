@@ -32,7 +32,6 @@ PARTITION_CONFIGS = {
 
 # Evaluation configs
 FAISS_TOP_K = 20
-SOLVER_PATH = "v1/build/glasgow_subgraph_solver.exe"
 
 # Query Params
 QUERY_NODES_MIN = 20
@@ -46,4 +45,4 @@ TARGET_QUERIES_PER_TYPE = 100
 # Baseline Comparison (Random Sampling vs FAISS)
 BASELINE_SAMPLE_SIZE = 10000  # Nodes to sample for random baseline
 BASELINE_TIMEOUT_SECONDS = 180  # 3 min timeout per attempt
-BASELINE_MAX_RETRIES = 10  # Max random sampling attempts
+BASELINE_MAX_RETRIES = 3  # Max random sampling attempts

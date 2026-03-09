@@ -286,14 +286,14 @@ def generate_multi_fine_partition_query(
         kwargs["fine_to_coarse_map"],
         kwargs["device"],
     )
-    num_frags, min_nodes, max_nodes = (
-        kwargs["num_frags"],
+    min_nodes, max_nodes = (
         kwargs["min_nodes"],
         kwargs["max_nodes"],
     )
     anchor_coarse_idx = kwargs.get("anchor_coarse_idx", None)
 
     for _ in range(50):  # Try 50 times
+        num_frags = random.choice([2, 3, 4])
         candidate_starts = (
             [idx for idx, c in fine_to_coarse_map.items() if c == anchor_coarse_idx]
             if anchor_coarse_idx is not None

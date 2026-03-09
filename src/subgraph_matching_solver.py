@@ -53,7 +53,7 @@ def _pyg_to_graph_file(data: Data, filepath: str, label_map: Optional[Dict[int, 
     """
     Write PyG data to SubgraphMatching binary format:
 
-        t N M
+        t 0 N
         v VertexID LabelId Degree
         e VertexId VertexId
 
@@ -97,39 +97,58 @@ def _pyg_to_graph_file(data: Data, filepath: str, label_map: Optional[Dict[int, 
             f.write(f'e {src} {dst}\n')
 
 
-def _parse_output(stdout_text: str) -> dict:
+def _parse_output(stdout_text: str, query_num_nodes: int) -> dict:
     """
     Parse output from SubgraphMatching.out.
 
-    The binary outputs stats like:
-        #Embeddings: 60
-        Enumeration Time: 0.001(seconds)
-        Call Count: ...
-        Total Time: ...
+    With our C++ patch, the binary prints:
+        Embedding 1: v0 v1 v2 v3
+        Embedding 2: v0 v1 v2 v3
+        ...
+        #Embeddings: N
+        Enumerate time (seconds): 0.001
 
-    Returns dict with embedding_count and timing info.
+    Returns dict with embeddings list and timing info.
     """
     result = {
-        'embedding_count': 0,
+        'embeddings': [],       # List of {query_node: target_node} dicts
+        'embedding_count': 0,   # From #Embeddings line (fallback)
         'enumeration_time': -1.0,
         'total_time': -1.0,
     }
 
+    emb_pattern = re.compile(r'^Embedding\s+\d+:\s*(.+)$')
+
     for line in stdout_text.splitlines():
         line = line.strip()
-        # Parse embedding count
+
+        # Parse embedding lines: "Embedding N: v0 v1 v2 ..."
+        m = emb_pattern.match(line)
+        if m:
+            values = m.group(1).strip().split()
+            mapping = {}
+            for q_node, t_node_str in enumerate(values):
+                try:
+                    mapping[q_node] = int(t_node_str)
+                except ValueError:
+                    pass
+            if mapping:
+                result['embeddings'].append(mapping)
+            continue
+
+        # Parse embedding count: "#Embeddings: N"
         if line.startswith('#Embeddings:') or line.startswith('Embedding Cnt:'):
             try:
                 result['embedding_count'] = int(line.split(':')[1].strip())
             except (ValueError, IndexError):
                 pass
         # Parse enumeration time
-        elif 'Enumeration' in line and 'Time' in line:
+        elif 'numerat' in line.lower() and 'time' in line.lower():
             m = re.search(r'([\d.]+)', line.split(':')[-1])
             if m:
                 result['enumeration_time'] = float(m.group(1))
         # Parse total time
-        elif line.startswith('Total Time:') or 'total time' in line.lower():
+        elif line.lower().startswith('total time'):
             m = re.search(r'([\d.]+)', line.split(':')[-1])
             if m:
                 result['total_time'] = float(m.group(1))
@@ -183,8 +202,11 @@ def subgraph_matching_solve(
     t_file.close()
 
     try:
-        _pyg_to_graph_file(query_data, q_path)
-        _pyg_to_graph_file(target_data, t_path)
+        query_labels = kwargs.get('query_labels')
+        target_labels = kwargs.get('target_labels')
+        
+        _pyg_to_graph_file(query_data, q_path, label_map=query_labels)
+        _pyg_to_graph_file(target_data, t_path, label_map=target_labels)
 
         # Build command
         cmd = [
@@ -216,9 +238,11 @@ def subgraph_matching_solve(
                 sig_num = -proc.returncode
                 sig_names = {4: 'SIGILL', 6: 'SIGABRT', 11: 'SIGSEGV'}
                 sig_name = sig_names.get(sig_num, f'signal {sig_num}')
-                print(f"[WARN] SubgraphMatching binary crashed: {sig_name} (code {proc.returncode})")
+                print(f"[WARN] SubgraphMatching binary crashed: {sig_name} (code {proc.returncode})", flush=True)
+                if stderr:
+                    print(f"[WARN] stderr: {stderr.strip()}", flush=True)
                 if sig_num == 4:
-                    print(f"[WARN] SIGILL = CPU does not support required instructions (AVX2?)")
+                    print(f"[WARN] SIGILL = CPU does not support required instructions (AVX2?)", flush=True)
                 return MatchResult(
                     found=False, timed_out=False,
                     latency_seconds=time.time() - start_time,
@@ -239,29 +263,64 @@ def subgraph_matching_solve(
 
         latency = time.time() - start_time
 
-        # Parse count-based output (SubgraphMatching only outputs counts, not mappings)
-        parsed = _parse_output(stdout)
-        embedding_count = parsed['embedding_count']
+        # Parse output — gets both embedding lines (if patched) and count/timing
+        parsed = _parse_output(stdout, query_data.num_nodes)
+        mappings = parsed['embeddings']
+        embedding_count = len(mappings) if mappings else parsed['embedding_count']
 
-        # SubgraphMatching is a benchmarking tool — it reports how many
-        # embeddings exist but doesn't output the actual node mappings.
-        # So we can only report found/count/timing, not per-node accuracy.
-        return MatchResult(
-            found=embedding_count > 0,
-            timed_out=timed_out,
-            num_solutions=embedding_count,
-            # Accuracy not available from count-only output
-            first_solution_accuracy=100.0 if embedding_count > 0 else -1.0,
-            best_accuracy=100.0 if embedding_count > 0 else -1.0,
-            avg_accuracy=100.0 if embedding_count > 0 else -1.0,
-            median_accuracy=100.0 if embedding_count > 0 else -1.0,
-            avg_nodes_matched=query_data.num_nodes if embedding_count > 0 else -1.0,
-            median_nodes_matched=query_data.num_nodes if embedding_count > 0 else -1.0,
-            latency_seconds=latency,
-            time_to_first_solution=parsed['enumeration_time'] if embedding_count > 0 else -1.0,
-            best_mapping=None,  # Mappings not available from this solver
-            solver_name=algorithm.lower(),
-        )
+        if mappings:
+            # We have actual mappings — compute real accuracy
+            accuracies = []
+            nodes_matched_list = []
+            best_idx = -1
+            best_acc = -1.0
+
+            for i, mapping in enumerate(mappings):
+                acc, correct, total = compute_mapping_accuracy(
+                    mapping, query_global_ids, target_global_ids
+                )
+                accuracies.append(acc)
+                nodes_matched_list.append(correct)
+                if acc > best_acc:
+                    best_acc = acc
+                    best_idx = i
+
+            agg = aggregate_solution_metrics(accuracies, nodes_matched_list)
+            best_mapping = mappings[best_idx] if 0 <= best_idx < len(mappings) else None
+            time_to_first = parsed['enumeration_time'] if parsed['enumeration_time'] > 0 else latency / max(len(mappings), 1)
+
+            return MatchResult(
+                found=True,
+                timed_out=timed_out,
+                num_solutions=len(mappings),
+                first_solution_accuracy=agg['first_solution_accuracy'],
+                best_accuracy=agg['best_accuracy'],
+                avg_accuracy=agg['avg_accuracy'],
+                median_accuracy=agg['median_accuracy'],
+                avg_nodes_matched=agg['avg_nodes_matched'],
+                median_nodes_matched=agg['median_nodes_matched'],
+                latency_seconds=latency,
+                time_to_first_solution=time_to_first,
+                best_mapping=best_mapping,
+                solver_name=algorithm.lower(),
+            )
+        else:
+            # No embedding lines — count-only (unpatched binary)
+            return MatchResult(
+                found=embedding_count > 0,
+                timed_out=timed_out,
+                num_solutions=embedding_count,
+                first_solution_accuracy=-1.0,
+                best_accuracy=-1.0,
+                avg_accuracy=-1.0,
+                median_accuracy=-1.0,
+                avg_nodes_matched=-1.0,
+                median_nodes_matched=-1.0,
+                latency_seconds=latency,
+                time_to_first_solution=parsed['enumeration_time'] if embedding_count > 0 else -1.0,
+                best_mapping=None,
+                solver_name=algorithm.lower(),
+            )
 
     finally:
         try:

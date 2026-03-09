@@ -2,7 +2,7 @@
 Jigsaw GNN Evaluation Framework
 
 Stratified partition evaluation with multiple query types and comprehensive metrics.
-Uses pluggable solvers (VF3, DP-iso, CFL, TurboISO) for subgraph isomorphism verification.
+Uses pluggable solvers (DP-iso, CFL, TurboISO) for subgraph isomorphism verification.
 """
 
 import os
@@ -54,7 +54,7 @@ class EvaluationMetrics:
     fine_recall_at_k: float = 0.0
     
     # Matching metrics
-    match_rate: float = 0.0  # % of queries where VF2 found isomorphism
+    match_rate: float = 0.0  # % of queries where solver found match
     node_accuracy: float = 0.0  # Average node mapping accuracy
     
     # Precision/Recall/F1 for node matching
@@ -65,7 +65,7 @@ class EvaluationMetrics:
     # Latency metrics (seconds)
     avg_embedding_latency: float = 0.0
     avg_faiss_latency: float = 0.0
-    avg_vf2_latency: float = 0.0
+    avg_solver_latency: float = 0.0
     avg_total_latency: float = 0.0
     
     # Counts
@@ -136,7 +136,7 @@ def aggregate_metrics(results: List[Dict]) -> EvaluationMetrics:
     metrics.fine_recall_at_k = np.mean([r.get('fine_in_top_k', False) for r in successful])
     
     # Matching metrics
-    matched = [r for r in successful if r.get('vf2_found', False)]
+    matched = [r for r in successful if r.get('solver_found', False)]
     metrics.match_rate = len(matched) / len(successful) if successful else 0
     
     if matched:
@@ -157,7 +157,7 @@ def aggregate_metrics(results: List[Dict]) -> EvaluationMetrics:
     # Latency metrics
     metrics.avg_embedding_latency = np.mean([r.get('embed_time', 0) for r in successful])
     metrics.avg_faiss_latency = np.mean([r.get('faiss_time', 0) for r in successful])
-    metrics.avg_vf2_latency = np.mean([r.get('vf2_time', 0) for r in successful])
+    metrics.avg_solver_latency = np.mean([r.get('solver_time', 0) for r in successful])
     metrics.avg_total_latency = np.mean([r.get('total_time', 0) for r in successful])
     
     return metrics
@@ -250,14 +250,14 @@ def run_random_sampling_baseline(
     sample_size: int = BASELINE_SAMPLE_SIZE,
     timeout_per_attempt: float = BASELINE_TIMEOUT_SECONDS,
     max_retries: int = BASELINE_MAX_RETRIES,
-    skip_vf2: bool = False
+    skip_solver: bool = False,
 ) -> Dict[str, Any]:
     """
     K-hop expansion baseline for big graph search.
     
     Picks a random anchor, expands via k-hop, then:
     1. ALWAYS computes ground-truth metrics (node overlap, partition coverage)
-    2. Optionally runs VF2 for isomorphism check (skipped if skip_vf2=True)
+    2. Optionally runs solver (dpiso) for isomorphism check (skipped if skip_solver=True)
     
     Tracks the BEST ground-truth metrics across all retry attempts.
     """
@@ -291,7 +291,7 @@ def run_random_sampling_baseline(
     for attempt in range(max_retries):
         result['baseline_attempts'] = attempt + 1
         elapsed = time.time() - total_start
-        print(f"      [Baseline] Try {attempt+1}/{max_retries} ({elapsed:.0f}s elapsed)", flush=True)
+        print(f"      [Random Sampling] Try {attempt+1}/{max_retries} ({elapsed:.0f}s elapsed)", flush=True)
         
         # Pick random anchor and expand via k-hop
         anchor = random.randint(0, num_nodes - 1)
@@ -316,11 +316,11 @@ def run_random_sampling_baseline(
                 continue
         else:
             if len(subset) < 10:
-                print(f"      [Baseline] Skip: too few nodes ({len(subset)})", flush=True)
+                print(f"      [Random Sampling] Skip: too few nodes ({len(subset)})", flush=True)
                 continue
         
         # ============================================================
-        # Ground-truth metrics (ALWAYS computed, no VF2 needed)
+        # Ground-truth metrics (ALWAYS computed, no solver needed)
         # ============================================================
         sample_node_set = set(subset.tolist())
         
@@ -343,7 +343,7 @@ def run_random_sampling_baseline(
             gt_partition_recall = gt_covered / len(true_coarse_indices) if true_coarse_indices else 0
             all_gt_found = (gt_covered == len(true_coarse_indices))
         
-        print(f"      [Baseline] Try {attempt+1}: sampled={len(sample_node_set)} nodes, "
+        print(f"      [Random Sampling] Try {attempt+1}: sampled={len(sample_node_set)} nodes, "
               f"node_recall={node_recall*100:.1f}%, "
               f"partition_recall={gt_partition_recall*100:.1f}%, "
               f"contains_query={contains_query}", flush=True)
@@ -360,47 +360,52 @@ def run_random_sampling_baseline(
         
         # If we already contain the full query, no need to keep trying
         if contains_query:
-            print(f"      [Baseline] Found all query nodes on attempt {attempt+1}!", flush=True)
+            print(f"      [Random Sampling] Found all query nodes on attempt {attempt+1}!", flush=True)
             result['baseline_contains_query'] = True
-            if skip_vf2:
+            if skip_solver:
                 result['baseline_time'] = time.time() - total_start
                 return result
         
         # ============================================================
-        # VF2 verification (ONLY if not skipped)
+        # Solver verification (ONLY if not skipped)
         # ============================================================
-        if not skip_vf2:
+        if not skip_solver:
             sampled_graph = _extract_subgraph(adj_t, subset, original_data)
             
             if sampled_graph is None or sampled_graph.num_nodes == 0:
-                print(f"      [Baseline] Skip VF2: empty subgraph", flush=True)
+                print(f"      [Random Sampling] Skip solver: empty subgraph", flush=True)
                 continue
             
-            print(f"      [Baseline] VF2 on {len(subset)} nodes (k={k}, timeout={timeout_per_attempt:.0f}s)...", flush=True)
+            print(f"      [Random Sampling] Solver (dpiso) on {len(subset)} nodes (k={k}, timeout={timeout_per_attempt:.0f}s)...", flush=True)
             
             try:
-                vf2_result = vf2_verify_subgraph(
-                    query_data, sampled_graph,
-                    query_global_ids, subset,
+                from src.solver_registry import run_solver
+                solver_result = run_solver(
+                    'dpiso',
+                    query_data=query_data,
+                    target_data=sampled_graph,
+                    query_global_ids=query_global_ids,
+                    target_global_ids=subset,
+                    max_solutions=1,
                     timeout_seconds=timeout_per_attempt
                 )
                 
-                if vf2_result.found:
+                if solver_result.found:
                     result['baseline_found'] = True
                     result['baseline_time'] = time.time() - total_start
-                    result['baseline_solutions'] = vf2_result.num_solutions
+                    result['baseline_solutions'] = solver_result.num_solutions
                     result['baseline_k_hops'] = k
                     return result
                     
             except Exception:
                 pass
             
-            # Check total time limit for VF2 retries
+            # Check total time limit for solver retries
             if time.time() - total_start > max_retries * timeout_per_attempt:
                 break
     
     result['baseline_time'] = time.time() - total_start
-    print(f"      [Baseline] Done: best_node_recall={best_node_recall*100:.1f}% "
+    print(f"      [Random Sampling] Done: best_node_recall={best_node_recall*100:.1f}% "
           f"over {result['baseline_attempts']} attempts ({result['baseline_time']:.1f}s)", flush=True)
     return result
 
@@ -420,16 +425,16 @@ def search_and_verify(
     top_k: int = 20,  # Changed from 5 to 20 for full partition coverage
     solver_timeout: float = 300.0,
     ground_truth_target: Optional[Data] = None,  # Stitched ground truth target
-    run_baseline: bool = False,  # Whether to run random sampling baseline
-    skip_solver: bool = False,  # Skip solver verification for faster testing
-    solver_name: str = 'vf3',  # Which solver to use
+    run_random_sampling: bool = False,  # Whether to run random sampling comparison
+    skip_solver: bool = False,  # Skip graph isomorphism verification for faster testing
+    solver_name: str = 'dpiso',  # Which solver to use
     run_full_graph: bool = False,  # Run solver on the full graph
 ) -> Dict[str, Any]:
     """
     Full search pipeline: embed -> FAISS search -> solver verify.
     
     Solver verification compares query vs stitched partition subgraph
-    using the selected solver (vf3, dpiso, cfl, turboiso).
+    using the selected solver (dpiso, cfl, turboiso).
     
     Returns:
         Dict with all timing and accuracy metrics
@@ -526,9 +531,11 @@ def search_and_verify(
             candidate_embeds = torch.cat([embed_fine(fine_graphs[i]) for i in candidate_fines], dim=0)
             print(f"      [S&V] Step 3 done", flush=True)
             
+            t_ff = time.time()
             faiss_fine = faiss.IndexFlatL2(candidate_embeds.shape[1])
             faiss_fine.add(candidate_embeds.cpu().numpy())
             _, I_fine = faiss_fine.search(zq.cpu().numpy(), min(top_k, len(candidate_fines)))
+            result['faiss_time'] += time.time() - t_ff
             
             predicted_fine_idx = candidate_fines[I_fine[0][0]]
             result['predicted_fine'] = predicted_fine_idx
@@ -538,12 +545,12 @@ def search_and_verify(
             result['fine_in_top_k'] = any(candidate_fines[i] in true_fine_indices for i in I_fine[0])
         
         # ================================================================
-        # 4. VF2 VERIFICATION - 2 comparisons:
+        # 4. SOLVER VERIFICATION - 2 comparisons:
         #    (a) Our Method: Top-3 + neighbors stitching (V1 style)
         #    (b) Baseline: Full graph search
         # ================================================================
         # ================================================================
-        # 4a. ITERATIVE STITCHING: Start small, expand on VF2 failure
+        # 4a. ITERATIVE STITCHING: Start small, expand on solver failure
         #     Step 1: Try just top-1 partition
         #     Step 2: If fail, expand to top-5 neighbors  
         #     Step 3: If still fail, expand to top-20
@@ -578,14 +585,33 @@ def search_and_verify(
         solver_time = 0.0
         solver_timed_out = False
         solver_first_acc = -1.0
+        solver_time_to_first = -1.0
         solver_best_acc = -1.0
         solver_avg_acc = -1.0
         solver_median_acc = -1.0
         solver_avg_nodes = -1.0
         solver_median_nodes = -1.0
+        
+        # Define get labels helper globally for the subgraph and full graph runs
+        from src.utils import feature_to_label
+        total_hashing_time = 0.0
+        
+        def _get_node_labels(x_tensor):
+            nonlocal total_hashing_time
+            if x_tensor is None:
+                return None
+            
+            t_hash = time.time()
+            labels = {}
+            for idx in range(x_tensor.size(0)):
+                labels[idx] = feature_to_label(x_tensor[idx])
+            total_hashing_time += time.time() - t_hash
+            return labels
+        
         stitched_nodes_count = 0
         final_stitched_indices = faiss_top20[:20]  # Fallback to FAISS if solver fails
         solver_level_reached = "none"  # Track which level solver succeeded/failed at
+        solver_level_numeric = 0        # Numeric version for averaging
         
         # Define expansion levels: (num_partitions, description)
         # Note: solver call is skipped inside the loop if skip_solver=True
@@ -651,18 +677,22 @@ def search_and_verify(
                     gids = stitched_graph.global_id.to(original_data.x.device)
                     stitched_graph.x = original_data.x[gids]
             
+            query_labels = _get_node_labels(query_data.x)
+            target_labels = _get_node_labels(stitched_graph.x)
+            
             stitched_global_ids = stitched_graph.global_id if hasattr(stitched_graph, 'global_id') else stitched_nodes
             
             # Update stitching metrics (always computed, regardless of skip_solver)
             stitched_nodes_count = len(stitched_nodes)
             final_stitched_indices = stitched_coarse_indices
             solver_level_reached = level_name  # Track which level we're at
+            solver_level_numeric = max_parts
             
             # Solver on this level (skip if skip_solver is True)
             if skip_solver:
                 print(f"      [S&V] Expansion {level_name}: Q={query_data.num_nodes}, S={stitched_graph.num_nodes} nodes (solver skipped)", flush=True)
                 # Don't run solver, just continue to next level to get max stitching
-            else:
+            if not skip_solver:
                 level_timeout = 300.0  # 5 min per level
                 print(f"      [S&V] {solver_name} {level_name}: Q={query_data.num_nodes}, S={stitched_graph.num_nodes} nodes...", flush=True)
                 
@@ -672,6 +702,8 @@ def search_and_verify(
                     target_data=stitched_graph,
                     query_global_ids=query_global_ids,
                     target_global_ids=stitched_global_ids,
+                    query_labels=query_labels,
+                    target_labels=target_labels,
                     max_solutions=100,
                     timeout_seconds=level_timeout,
                 )
@@ -683,6 +715,7 @@ def search_and_verify(
                     solver_solutions = solver_result.num_solutions
                     solver_timed_out = solver_result.timed_out
                     solver_first_acc = solver_result.first_solution_accuracy
+                    solver_time_to_first = solver_result.time_to_first_solution
                     solver_best_acc = solver_result.best_accuracy
                     solver_avg_acc = solver_result.avg_accuracy
                     solver_median_acc = solver_result.median_accuracy
@@ -701,13 +734,16 @@ def search_and_verify(
         result['solver_solutions'] = solver_solutions
         result['solver_timed_out'] = solver_timed_out
         result['solver_first_accuracy'] = solver_first_acc
+        result['solver_time_to_first'] = solver_time_to_first
         result['solver_best_accuracy'] = solver_best_acc
         result['solver_avg_accuracy'] = solver_avg_acc
         result['solver_median_accuracy'] = solver_median_acc
         result['solver_avg_nodes_matched'] = solver_avg_nodes
         result['solver_median_nodes_matched'] = solver_median_nodes
         result['solver_time'] = solver_time
+        result['hashing_time'] = total_hashing_time
         result['solver_level_reached'] = solver_level_reached
+        result['solver_level_numeric'] = solver_level_numeric
         result['stitched_nodes'] = stitched_nodes_count
         result['stitched_partitions'] = final_stitched_indices
         result['num_stitched'] = len(final_stitched_indices)
@@ -727,9 +763,9 @@ def search_and_verify(
         # Query stats
         result['query_nodes'] = len(query_global_ids) if query_global_ids is not None else 0
         
-        # 4b. Random Sampling Baseline — GT metrics ALWAYS run, VF2 is optional
-        if original_data is not None:
-            baseline_result = run_random_sampling_baseline(
+        # 4b. Random Sampling — GT metrics ALWAYS run, Isomorphism is optional
+        if original_data is not None and run_random_sampling:
+            rs_result = run_random_sampling_baseline(
                 query_data, query_global_ids,
                 original_data, adj_t,
                 true_coarse_indices=true_coarse_indices,
@@ -737,19 +773,19 @@ def search_and_verify(
                 sample_size=BASELINE_SAMPLE_SIZE,
                 timeout_per_attempt=BASELINE_TIMEOUT_SECONDS,
                 max_retries=BASELINE_MAX_RETRIES,
-                skip_vf2=(skip_solver or not run_baseline)
+                skip_solver=skip_solver,
             )
-            result['vf2_baseline_found'] = baseline_result['baseline_found']
-            result['vf2_baseline_time'] = baseline_result['baseline_time']
-            result['vf2_baseline_attempts'] = baseline_result['baseline_attempts']
-            result['vf2_baseline_sample_size'] = baseline_result['baseline_sample_size']
-            # Ground-truth metrics (best across all baseline attempts)
-            result['baseline_node_precision'] = baseline_result['baseline_node_precision']
-            result['baseline_node_recall'] = baseline_result['baseline_node_recall']
-            result['baseline_node_f1'] = baseline_result['baseline_node_f1']
-            result['baseline_gt_partition_recall'] = baseline_result['baseline_gt_partition_recall']
-            result['baseline_all_gt_found'] = baseline_result['baseline_all_gt_found']
-            result['baseline_contains_query'] = baseline_result['baseline_contains_query']
+            result['rs_solver_found'] = rs_result['baseline_found']
+            result['rs_solver_time'] = rs_result['baseline_time']
+            result['rs_solver_attempts'] = rs_result['baseline_attempts']
+            result['rs_solver_sample_size'] = rs_result['baseline_sample_size']
+            # Ground-truth metrics (best across all attempts)
+            result['rs_node_precision'] = rs_result['baseline_node_precision']
+            result['rs_node_recall'] = rs_result['baseline_node_recall']
+            result['rs_node_f1'] = rs_result['baseline_node_f1']
+            result['rs_gt_partition_recall'] = rs_result['baseline_gt_partition_recall']
+            result['rs_all_gt_found'] = rs_result['baseline_all_gt_found']
+            result['rs_contains_query'] = rs_result['baseline_contains_query']
         
         result['solver_total_time'] = time.time() - t_solver
         
@@ -761,12 +797,22 @@ def search_and_verify(
             # Build full graph target
             full_graph_gids = torch.arange(original_data.num_nodes)
             
+            # Use hashed labels if computing
+            if hasattr(original_data, 'x') and original_data.x is not None:
+                target_full_labels = _get_node_labels(original_data.x)
+                if 'query_labels' not in locals():
+                    query_labels = _get_node_labels(query_data.x)
+            else:
+                target_full_labels = None
+            
             full_graph_result = run_solver(
                 solver_name,
                 query_data=query_data,
                 target_data=original_data,
                 query_global_ids=query_global_ids,
                 target_global_ids=full_graph_gids,
+                query_labels=query_labels if 'query_labels' in locals() else None,
+                target_labels=target_full_labels,
                 max_solutions=100,
                 timeout_seconds=300.0,  # 5 min for full graph
             )
@@ -775,6 +821,7 @@ def search_and_verify(
             result['full_graph_solver_timed_out'] = full_graph_result.timed_out
             result['full_graph_solver_solutions'] = full_graph_result.num_solutions
             result['full_graph_solver_first_accuracy'] = full_graph_result.first_solution_accuracy
+            result['full_graph_time_to_first'] = full_graph_result.time_to_first_solution
             result['full_graph_solver_best_accuracy'] = full_graph_result.best_accuracy
             result['full_graph_solver_avg_accuracy'] = full_graph_result.avg_accuracy
             result['full_graph_solver_time'] = full_graph_result.latency_seconds
@@ -838,9 +885,9 @@ def run_stratified_evaluation(
     top_k: int = 5,
     device: torch.device = None,
     checkpoint_path: str = None,
-    run_baseline: bool = False,  # Whether to run k-hop baseline comparison
-    skip_solver: bool = False,  # Skip solver verification for faster testing
-    solver_name: str = 'vf3',  # Which solver to use
+    run_random_sampling: bool = False,  # Whether to run random sampling comparison
+    skip_solver: bool = False,  # Skip graph isomorphism verification for faster testing
+    solver_name: str = 'dpiso',  # Which solver to use
     run_full_graph: bool = False,  # Run solver on full graph (SLOW)
 ) -> pd.DataFrame:
     """
@@ -940,7 +987,6 @@ def run_stratified_evaluation(
                         'node_to_coarse_map': context.get('node_to_coarse_map', {}),
                         'G_nx': context.get('G_nx', None),  # For sibling_walk and multi_coarse 
                         'anchor_coarse_idx': anchor_coarse_idx,
-                        'num_frags': 2,  # For sibling_walk and multi_fine (reduced for small graphs)
                     }
                     
                     res = generator(**gen_kwargs)
@@ -955,42 +1001,49 @@ def run_stratified_evaluation(
                     true_coarse = res[4] if len(res) > 4 else res[3]  # Some generators return 4, some return 5
                     print(f"    [P{anchor_coarse_idx}][Q{i}] Generated: Q={query_data.num_nodes} nodes, T={target_data.num_nodes if target_data else 0} nodes", flush=True)
                     
-                    # Search and verify with ground truth target  
-                    print(f"    [P{anchor_coarse_idx}][Q{i}] Starting search_and_verify...", flush=True)
-                    result = search_and_verify(
-                        query_data, query_global_ids, true_coarse,
-                        context, encoder, device, top_k,
-                        ground_truth_target=target_data,
-                        run_baseline=run_baseline,
-                        skip_solver=skip_solver,
-                        solver_name=solver_name,
-                        run_full_graph=run_full_graph,
-                    )
-                    print(f"    [P{anchor_coarse_idx}][Q{i}] search_and_verify done (success={result.get('success', False)})", flush=True)
+                    solvers_to_run = ['dpiso', 'cfl', 'turboiso'] if solver_name == 'all' else [solver_name]
                     
-                    result['query_type'] = query_type
-                    result['anchor_coarse'] = anchor_coarse_idx
-                    result['query_id'] = f"{query_type}_{anchor_coarse_idx}_{i}"
-                    
-                    # Useful logging: query size, stitched size, recall, solver results
-                    q_nodes = result.get('query_nodes', 0)
-                    stitched = result.get('stitched_nodes', 0)
-                    solver_ok = "\u2713" if result.get('solver_found', False) else "\u2717"
-                    recall = result.get('gt_partition_recall', 0) * 100
-                    
-                    # Build log string
-                    log_str = f"    [P{anchor_coarse_idx}][Q{i}] Q:{q_nodes} -> Stitch:{stitched} (rec:{recall:.0f}%) Solver:{solver_ok}"
-                    
-                    # Add baseline result if enabled
-                    if 'vf2_baseline_found' in result:
-                        baseline_found = "\u2713" if result.get('vf2_baseline_found', False) else "\u2717"
-                        baseline_tries = result.get('vf2_baseline_attempts', 0)
-                        log_str += f" | Baseline:{baseline_found}({baseline_tries}tries)"
-                    
-                    print(log_str, flush=True)
-                    
-                    all_results.append(result)
-                    
+                    for s_name in solvers_to_run:
+                        # Search and verify with ground truth target  
+                        print(f"    [P{anchor_coarse_idx}][Q{i}] Starting search_and_verify ({s_name})...", flush=True)
+                        result = search_and_verify(
+                            query_data, query_global_ids, true_coarse,
+                            context, encoder, device, top_k,
+                            ground_truth_target=target_data,
+                            run_random_sampling=run_random_sampling if s_name == solvers_to_run[0] else False, # Only run once per query
+                            skip_solver=skip_solver,
+                            solver_name=s_name,
+                            run_full_graph=run_full_graph,
+                        )
+                        print(f"    [P{anchor_coarse_idx}][Q{i}] search_and_verify done (success={result.get('success', False)})", flush=True)
+                        
+                        result['query_type'] = query_type
+                        result['anchor_coarse'] = anchor_coarse_idx
+                        result['query_id'] = f"{query_type}_{anchor_coarse_idx}_{i}_{s_name}"
+                        
+                        # Useful logging: query size, stitched size, recall, solver results
+                        q_nodes = result.get('query_nodes', 0)
+                        stitched = result.get('stitched_nodes', 0)
+                        solver_ok = "\u2713" if result.get('solver_found', False) else "\u2717"
+                        recall = result.get('gt_partition_recall', 0) * 100
+                        
+                        # Build log string
+                        log_str = f"    [P{anchor_coarse_idx}][Q{i}][{s_name}] Q:{q_nodes} -> Stitch:{stitched} (rec:{recall:.0f}%) Solver:{solver_ok}"
+                        
+                        # Add random sampling result if enabled
+                        if 'rs_solver_found' in result:
+                            rs_found = "\u2713" if result.get('rs_solver_found', False) else "\u2717"
+                            rs_tries = result.get('rs_solver_attempts', 0)
+                            log_str += f" | Random Sampling:{rs_found}({rs_tries}tries)"
+                        
+                        print(log_str, flush=True)
+                        
+                        all_results.append(result)
+                        
+                        # Save checkpoint periodically
+                        if checkpoint_path and (len(all_results) % 5 == 0):
+                            pd.DataFrame(all_results).to_csv(checkpoint_path, index=False)
+                            
                 except Exception as e:
                     import traceback
                     print(f"    [P{anchor_coarse_idx}][Q{i}] ERROR: {e}", flush=True)
@@ -1051,22 +1104,42 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             if 'recall_at_20' in successful.columns:
                 log(f"  Recall@20:           {successful['recall_at_20'].mean()*100:.1f}%")
             
-            if 'vf2_stitched_found' in successful.columns:
-                vf2_stitched = successful['vf2_stitched_found'].mean()*100
-                log(f"  VF2 Stitched Match:  {vf2_stitched:.1f}% (Our Method)")
-            if 'vf2_baseline_found' in successful.columns:
-                vf2_base = successful[successful['vf2_baseline_found'].notna()]['vf2_baseline_found'].mean()*100
-                log(f"  VF2 Baseline Match:  {vf2_base:.1f}% (Full Graph)")
+            if 'solver_found' in successful.columns:
+                sf = successful['solver_found'].mean() * 100
+                log(f"  Solver Stitched Match: {sf:.2f}% (Our Method)")
+            if 'solver_first_accuracy' in successful.columns:
+                log(f"  Solver Stitched First Acc: {successful['solver_first_accuracy'].mean():.2f}%")
+            if 'solver_time_to_first' in successful.columns:
+                log(f"  Solver Stitched Time-to-First: {successful['solver_time_to_first'].mean()*1000:.3f}ms")
+            if 'solver_best_accuracy' in successful.columns:
+                log(f"  Solver Stitched Best Acc: {successful['solver_best_accuracy'].mean():.2f}%")
+            if 'full_graph_solver_found' in successful.columns:
+                log(f"  --- Oracle (Full Graph) ---")
+                fg_found = successful['full_graph_solver_found'].mean()*100
+                log(f"    Solver Full Graph:   {fg_found:.2f}%")
+            if 'full_graph_solver_first_accuracy' in successful.columns:
+                log(f"    Full Graph First Acc: {successful['full_graph_solver_first_accuracy'].mean():.2f}%")
+            if 'full_graph_time_to_first' in successful.columns:
+                log(f"    Full Graph Time-to-First: {successful['full_graph_time_to_first'].mean()*1000:.3f}ms")
+            if 'full_graph_solver_best_accuracy' in successful.columns:
+                log(f"    Full Graph Best Acc: {successful['full_graph_solver_best_accuracy'].mean():.2f}%")
+            if 'full_graph_total_time' in successful.columns:
+                log(f"    Full Graph Avg Latency: {successful['full_graph_total_time'].mean()*1000:.3f}ms")
+            if 'rs_solver_found' in successful.columns:
+                rs_base = successful[successful['rs_solver_found'].notna()]['rs_solver_found'].mean()*100
+                log(f"  Solver Random Sampling Match:   {rs_base:.2f}% (Random Sampling)")
             
-            # Baseline ground-truth metrics (random sampling vs our FAISS)
-            if 'baseline_node_recall' in successful.columns and successful['baseline_node_recall'].notna().any():
-                bl = successful[successful['baseline_node_recall'].notna()]
-                log(f"  --- Baseline (Random Sampling) ---")
-                log(f"    Node Recall:       {bl['baseline_node_recall'].mean()*100:.1f}%")
-                log(f"    Node Precision:    {bl['baseline_node_precision'].mean()*100:.1f}%")
-                log(f"    Node F1:           {bl['baseline_node_f1'].mean()*100:.1f}%")
-                log(f"    GT Part. Recall:   {bl['baseline_gt_partition_recall'].mean()*100:.1f}%")
-                log(f"    Contains Query:    {bl['baseline_contains_query'].mean()*100:.1f}%")
+            # Ground-truth metrics (random sampling vs our FAISS)
+            if 'rs_node_recall' in successful.columns and successful['rs_node_recall'].notna().any():
+                bl = successful[successful['rs_node_recall'].notna()]
+                log(f"  --- Random Sampling ---")
+                log(f"    Node Recall:       {bl['rs_node_recall'].mean()*100:.2f}%")
+                log(f"    Node Precision:    {bl['rs_node_precision'].mean()*100:.2f}%")
+                log(f"    Node F1:           {bl['rs_node_f1'].mean()*100:.2f}%")
+                log(f"    GT Part. Recall:   {bl['rs_gt_partition_recall'].mean()*100:.2f}%")
+                log(f"    Contains Query:    {bl['rs_contains_query'].mean()*100:.2f}%")
+                if 'rs_solver_time' in bl.columns:
+                    log(f"    Avg Latency:       {bl['rs_solver_time'].mean()*1000:.3f}ms")
             
             if 'query_nodes' in successful.columns:
                 log(f"  Avg Query Nodes:     {successful['query_nodes'].mean():.0f}")
@@ -1075,10 +1148,14 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             if 'num_stitched' in successful.columns:
                 log(f"  Avg Partitions:      {successful['num_stitched'].mean():.1f}")
             
-            log(f"  Avg Latency:         {successful['total_time'].mean()*1000:.1f}ms")
-            log(f"    - Embedding:       {successful['embed_time'].mean()*1000:.1f}ms")
-            log(f"    - FAISS:           {successful['faiss_time'].mean()*1000:.1f}ms")
-            log(f"    - VF2:             {successful['vf2_time'].mean()*1000:.1f}ms")
+            log(f"  --- Latency Breakdown ---")
+            log(f"    Total Avg Latency:   {successful['total_time'].mean()*1000:.3f}ms")
+            log(f"      - Embedding:       {successful['embed_time'].mean()*1000:.3f}ms")
+            if 'hashing_time' in successful.columns:
+                log(f"      - Hashing:         {successful['hashing_time'].mean()*1000:.3f}ms")
+            log(f"      - FAISS:           {successful['faiss_time'].mean()*1000:.3f}ms")
+            if 'solver_total_time' in successful.columns:
+                log(f"      - Solver:          {successful['solver_total_time'].mean()*1000:.3f}ms")
     
     # OVERALL summary
     all_successful = actual_queries[actual_queries['success'] == True]
@@ -1099,19 +1176,86 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             log(f"  Recall@5:            {all_successful['recall_at_5'].mean()*100:.1f}%")
         if 'recall_at_20' in all_successful.columns:
             log(f"  Recall@20:           {all_successful['recall_at_20'].mean()*100:.1f}%")
-        if 'vf2_stitched_found' in all_successful.columns:
-            log(f"  VF2 Stitched Match:  {all_successful['vf2_stitched_found'].mean()*100:.1f}% (Our Method)")
-        if 'baseline_node_recall' in all_successful.columns and all_successful['baseline_node_recall'].notna().any():
-            bl = all_successful[all_successful['baseline_node_recall'].notna()]
-            log(f"  --- Baseline (Random Sampling) ---")
-            log(f"    Node Recall:       {bl['baseline_node_recall'].mean()*100:.1f}%")
-            log(f"    GT Part. Recall:   {bl['baseline_gt_partition_recall'].mean()*100:.1f}%")
-            log(f"    Contains Query:    {bl['baseline_contains_query'].mean()*100:.1f}%")
+        if 'solver_found' in all_successful.columns:
+            log(f"  Solver Stitched Match: {all_successful['solver_found'].mean()*100:.2f}% (Our Method)")
+        if 'solver_first_accuracy' in all_successful.columns:
+            log(f"  Solver Stitched First Acc: {all_successful['solver_first_accuracy'].mean():.2f}%")
+        if 'solver_time_to_first' in all_successful.columns:
+            log(f"  Solver Stitched Time-to-First: {all_successful['solver_time_to_first'].mean()*1000:.3f}ms")
+        if 'solver_best_accuracy' in all_successful.columns:
+            log(f"  Solver Stitched Best Acc: {all_successful['solver_best_accuracy'].mean():.2f}%")
+        if 'full_graph_solver_found' in all_successful.columns:
+            log(f"  --- Oracle (Full Graph) ---")
+            log(f"    Solver Full Graph:   {all_successful['full_graph_solver_found'].mean()*100:.2f}%")
+        if 'full_graph_solver_first_accuracy' in all_successful.columns:
+            log(f"    Full Graph First Acc: {all_successful['full_graph_solver_first_accuracy'].mean():.2f}%")
+        if 'full_graph_time_to_first' in all_successful.columns:
+            log(f"    Full Graph Time-to-First: {all_successful['full_graph_time_to_first'].mean()*1000:.3f}ms")
+        if 'full_graph_solver_best_accuracy' in all_successful.columns:
+            log(f"    Full Graph Best Acc: {all_successful['full_graph_solver_best_accuracy'].mean():.2f}%")
+        if 'full_graph_total_time' in all_successful.columns:
+            log(f"    Full Graph Avg Latency: {all_successful['full_graph_total_time'].mean()*1000:.3f}ms")
+        if 'rs_node_recall' in all_successful.columns and all_successful['rs_node_recall'].notna().any():
+            bl = all_successful[all_successful['rs_node_recall'].notna()]
+            log(f"  --- Random Sampling ---")
+            log(f"    Node Recall:       {bl['rs_node_recall'].mean()*100:.2f}%")
+            log(f"    Node Precision:    {bl['rs_node_precision'].mean()*100:.2f}%")
+            log(f"    Node F1:           {bl['rs_node_f1'].mean()*100:.2f}%")
+            log(f"    GT Part. Recall:   {bl['rs_gt_partition_recall'].mean()*100:.2f}%")
+            log(f"    Contains Query:    {bl['rs_contains_query'].mean()*100:.2f}%")
+            if 'rs_solver_time' in bl.columns:
+                log(f"    Avg Latency:       {bl['rs_solver_time'].mean()*1000:.3f}ms")
         if 'query_nodes' in all_successful.columns:
             log(f"  Avg Query Nodes:     {all_successful['query_nodes'].mean():.0f}")
         if 'stitched_nodes' in all_successful.columns:
             log(f"  Avg Stitched Nodes:  {all_successful['stitched_nodes'].mean():.0f}")
-        log(f"  Avg Latency:         {all_successful['total_time'].mean()*1000:.1f}ms")
+        log(f"  --- Latency Breakdown ---")
+        log(f"    Total Avg Latency:   {all_successful['total_time'].mean()*1000:.3f}ms")
+        log(f"      - Embedding:       {all_successful['embed_time'].mean()*1000:.3f}ms")
+        if 'hashing_time' in all_successful.columns:
+            log(f"      - Hashing:         {all_successful['hashing_time'].mean()*1000:.3f}ms")
+        log(f"      - FAISS:           {all_successful['faiss_time'].mean()*1000:.3f}ms")
+        if 'solver_total_time' in all_successful.columns:
+            log(f"      - Solver:          {all_successful['solver_total_time'].mean()*1000:.3f}ms")
+
+    # SOLVER COMPARISON
+    solvers = [s for s in actual_queries['solver_name'].unique() if s is not None]
+    if len(solvers) > 1 or (len(solvers) == 1 and run_full_graph):
+        log(f"\n" + "="*70)
+        log(f"SOLVER COMPARISON")
+        log(f"="*70)
+        
+        # 1. OUR METHOD (STITCHED)
+        log(f"\n--- OUR METHOD (Stitched Partition Subgraph) ---")
+        for sname in solvers:
+            s_subset = actual_queries[(actual_queries['solver_name'] == sname) & (actual_queries['success'] == True)]
+            if len(s_subset) == 0: continue
+            
+            log(f"  [{sname.upper()}]")
+            log(f"    Match Rate:        {s_subset['solver_found'].mean()*100:.2f}%")
+            log(f"    Best Accuracy:     {s_subset['solver_best_accuracy'].mean():.2f}%")
+            log(f"    First Accuracy:    {s_subset['solver_first_accuracy'].mean():.2f}%")
+            log(f"    Time to First:     {s_subset['solver_time_to_first'].mean()*1000:.3f}ms")
+            log(f"    Total Solver Time: {s_subset['solver_total_time'].mean()*1000:.3f}ms")
+            if 'solver_level_numeric' in s_subset.columns:
+                log(f"    Avg Expansion Lvl: {s_subset['solver_level_numeric'].mean():.2f}")
+            log("")
+
+        # 2. ORACLE (FULL GRAPH)
+        if 'full_graph_solver_found' in actual_queries.columns:
+            log(f"\n--- ORACLE (Full Graph Search) ---")
+            # For each solver used on full graph
+            for sname in solvers:
+                s_subset = actual_queries[(actual_queries['solver_name'] == sname) & (actual_queries['success'] == True)]
+                if len(s_subset) == 0: continue
+                
+                log(f"  [{sname.upper()}]")
+                log(f"    Match Rate:        {s_subset['full_graph_solver_found'].mean()*100:.2f}%")
+                log(f"    Best Accuracy:     {s_subset['full_graph_solver_best_accuracy'].mean():.2f}%")
+                log(f"    First Accuracy:    {s_subset['full_graph_solver_first_accuracy'].mean():.2f}%")
+                log(f"    Time to First:     {s_subset['full_graph_time_to_first'].mean()*1000:.3f}ms")
+                log(f"    Total Solver Time: {s_subset['full_graph_solver_time'].mean()*1000:.3f}ms")
+                log("")
     
     # Save to text file if requested
     if output_txt:
@@ -1130,14 +1274,45 @@ def add_summary_rows(df: pd.DataFrame) -> pd.DataFrame:
     
     # Key metrics to summarize
     numeric_cols = ['recall_at_1', 'recall_at_5', 'recall_at_20', 'gt_partition_recall',
-                    'coarse_recall_at_k', 'embed_time', 'faiss_time', 'vf2_time', 'total_time',
-                    'query_nodes', 'stitched_nodes', 'num_stitched']
+                    'coarse_recall_at_k', 'embed_time', 'hashing_time', 'faiss_time',
+                    'solver_time', 'solver_total_time', 'total_time',
+                    'query_nodes', 'stitched_nodes', 'num_stitched',
+                    'rs_solver_found', 'rs_node_precision', 'rs_node_recall', 'rs_node_f1',
+                    'rs_gt_partition_recall', 'rs_all_gt_found', 'rs_contains_query',
+                    'rs_solver_time', 'rs_solver_attempts', 'rs_solver_sample_size',
+                    'solver_found', 'solver_solutions', 'solver_timed_out',
+                    'solver_level_numeric',
+                    'solver_first_accuracy', 'solver_time_to_first', 'solver_best_accuracy', 'solver_avg_accuracy',
+                    'solver_median_accuracy', 'solver_avg_nodes_matched', 'solver_median_nodes_matched',
+                    'full_graph_solver_found', 'full_graph_solver_timed_out', 'full_graph_solver_solutions',
+                    'full_graph_solver_first_accuracy', 'full_graph_time_to_first', 'full_graph_solver_best_accuracy',
+                    'full_graph_solver_avg_accuracy', 'full_graph_solver_time', 'full_graph_total_time',
+                    'precision', 'recall', 'f1']
     
     # Filter to only columns that exist
     numeric_cols = [c for c in numeric_cols if c in df.columns]
     
-    # Summary per query type
-    if 'query_type' in df.columns:
+    # Summary per query type and solver
+    if 'query_type' in df.columns and 'solver_name' in df.columns:
+        for qtype in df['query_type'].unique():
+            subset_q = df[df['query_type'] == qtype]
+            for sname in subset_q['solver_name'].unique():
+                subset = subset_q[subset_q['solver_name'] == sname]
+                
+                # Median row
+                median_row = {'query_type': qtype, 'solver_name': sname, 'query_id': f'{qtype}_{sname}_MEDIAN', 'success': True}
+                for col in numeric_cols:
+                    if col in subset.columns:
+                        median_row[col] = subset[col].median()
+                summary_rows.append(median_row)
+                
+                # Average row
+                avg_row = {'query_type': qtype, 'solver_name': sname, 'query_id': f'{qtype}_{sname}_AVERAGE', 'success': True}
+                for col in numeric_cols:
+                    if col in subset.columns:
+                        avg_row[col] = subset[col].mean()
+                summary_rows.append(avg_row)
+    elif 'query_type' in df.columns:
         for qtype in df['query_type'].unique():
             subset = df[df['query_type'] == qtype]
             
@@ -1164,6 +1339,16 @@ def add_summary_rows(df: pd.DataFrame) -> pd.DataFrame:
             overall_avg[col] = df[col].mean()
     summary_rows.append(overall_median)
     summary_rows.append(overall_avg)
+    
+    # Overall per solver
+    if 'solver_name' in df.columns:
+        for sname in df['solver_name'].unique():
+            subset = df[df['solver_name'] == sname]
+            s_avg = {'query_type': 'OVERALL', 'solver_name': sname, 'query_id': f'OVERALL_{sname}_AVERAGE', 'success': True}
+            for col in numeric_cols:
+                if col in subset.columns:
+                    s_avg[col] = subset[col].mean()
+            summary_rows.append(s_avg)
     
     # Append summary rows to DataFrame
     summary_df = pd.DataFrame(summary_rows)
@@ -1194,13 +1379,13 @@ def main():
                         help='Path to cache/load hierarchy pickle (e.g., cache/cora_hierarchy.pkl)')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='Path to checkpoint JSON for resumability')
-    parser.add_argument('--run_baseline', action='store_true',
+    parser.add_argument('--run_random_sampling', action='store_true',
                         help='Run k-hop random sampling baseline (SLOW, for comparison)')
     parser.add_argument('--skip_solver', action='store_true',
                         help='Skip solver verification (faster, only FAISS + GT metrics)')
-    parser.add_argument('--solver', type=str, default='vf3',
-                        choices=['vf3', 'dpiso', 'cfl', 'turboiso', 'all'],
-                        help='Subgraph isomorphism solver to use (default: vf3)')
+    parser.add_argument('--solver', type=str, default='dpiso',
+                        choices=['dpiso', 'cfl', 'turboiso', 'all'],
+                        help='Subgraph isomorphism solver to use (default: dpiso)')
     parser.add_argument('--run_full_graph', action='store_true',
                         help='Run solver on the full graph for each query (SLOW)')
     parser.add_argument('--query_types', type=str, default=None,
@@ -1388,7 +1573,7 @@ def main():
         top_k=args.top_k,
         device=DEVICE,
         checkpoint_path=args.checkpoint,
-        run_baseline=args.run_baseline,
+        run_random_sampling=args.run_random_sampling,
         skip_solver=args.skip_solver,
         solver_name=args.solver,
         run_full_graph=args.run_full_graph,

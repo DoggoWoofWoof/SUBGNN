@@ -52,17 +52,21 @@ image = (
         "faiss-cpu>=1.7.4",
         "pandas>=2.0.0",
         "tqdm>=4.65.0",
-        "vf3py",  # VF3 subgraph isomorphism solver
     )
     # Build SubgraphMatching binary (DP-iso, CFL, TurboISO)
+    .add_local_file("patch_embeddings.py", remote_path="/app/patch_embeddings.py", copy=True)
     .run_commands(
         "git clone https://github.com/RapidsAtHKUST/SubgraphMatching.git /app/SubgraphMatching",
+        # Patch config.h: increase max query size, SI 2 = scalar (no AVX2), HYBRID 1 = merge-based (no AVX2 galloping), enable failing set
+        "sed -i 's/#define MAXIMUM_QUERY_GRAPH_SIZE 64/#define MAXIMUM_QUERY_GRAPH_SIZE 256/' /app/SubgraphMatching/configuration/config.h",
         # Patch config.h: SI 2 = scalar (no AVX2), HYBRID 1 = merge-based (no AVX2 galloping), enable failing set
         "sed -i 's/#define SI 0/#define SI 2/' /app/SubgraphMatching/configuration/config.h",
         "sed -i 's/#define HYBRID 0/#define HYBRID 1/' /app/SubgraphMatching/configuration/config.h",
         "sed -i 's|// #define ENABLE_FAILING_SET|#define ENABLE_FAILING_SET|' /app/SubgraphMatching/configuration/config.h",
         # Remove -march=native, use x86-64-v2 for portability (SSE4.2 but no AVX2)
         "sed -i 's/-march=native/-march=x86-64-v2/' /app/SubgraphMatching/CMakeLists.txt",
+        # Patch EvaluateQuery.cpp to print actual embedding mappings
+        "python3 /app/patch_embeddings.py /app/SubgraphMatching/matching/EvaluateQuery.cpp",
         "cd /app/SubgraphMatching && mkdir -p build && cd build && cmake .. && make -j$(nproc)",
     )
 )
@@ -135,9 +139,9 @@ def run_evaluation(
     target_queries: int = 10,
     top_k: int = 20,
     skip_solver: bool = False,
-    run_baseline: bool = False,
+    run_random_sampling: bool = False,
     query_types: str = None,
-    solver: str = 'vf3',
+    solver: str = 'dpiso',
     run_full_graph: bool = False,
 ):
     """
@@ -180,8 +184,8 @@ def run_evaluation(
 
     if skip_solver:
         cmd.append("--skip_solver")
-    if run_baseline:
-        cmd.append("--run_baseline")
+    if run_random_sampling:
+        cmd.append("--run_random_sampling")
     if query_types:
         cmd.extend(["--query_types", query_types])
     if solver:
@@ -213,7 +217,7 @@ def download_result(dataset: str = "cora", filename: str = None):
         filename = f"{dataset}_eval.csv"
     path = f"{VOLUME_PATH}/results/{filename}"
     if os.path.exists(path):
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             return f.read()
     return None
 
@@ -227,11 +231,11 @@ def main(
     target_queries: int = 10,
     top_k: int = 20,
     skip_solver: bool = False,
-    run_baseline: bool = False,
+    run_random_sampling: bool = False,
     setup_only: bool = False,
     download: bool = False,
     query_types: str = None,
-    solver: str = 'vf3',
+    solver: str = 'dpiso',
     run_full_graph: bool = False,
 ):
     """
@@ -287,7 +291,7 @@ def main(
     print(f"  Top-k        : {top_k}")
     print(f"  Skip Solver  : {skip_solver}")
     print(f"  Solver       : {solver}")
-    print(f"  Baseline     : {run_baseline}")
+    print(f"  Rand-Sampling: {run_random_sampling}")
     print(f"  Full Graph   : {run_full_graph}")
     print(f"  Query Types  : {query_types or 'all'}")
     print("=" * 60)
@@ -309,7 +313,7 @@ def main(
             target_queries=target_queries,
             top_k=top_k,
             skip_solver=skip_solver,
-            run_baseline=run_baseline,
+            run_random_sampling=run_random_sampling,
             query_types=query_types,
             solver=solver,
             run_full_graph=run_full_graph,
@@ -329,7 +333,7 @@ def main(
         csv_text = download_result.remote(ds)
         if csv_text:
             out = f"{ds}_eval.csv"
-            with open(out, "w") as f:
+            with open(out, "wb") as f:
                 f.write(csv_text)
             print(f"   ✓ Saved {out}")
         else:
@@ -339,9 +343,19 @@ def main(
         summary_text = download_result.remote(ds, filename=f"{ds}_eval_summary.txt")
         if summary_text:
             out_txt = f"{ds}_eval_summary.txt"
-            with open(out_txt, "w") as f:
+            with open(out_txt, "wb") as f:
                 f.write(summary_text)
             print(f"   ✓ Saved {out_txt}")
+            
+        # Download debug dump if it exists
+        try:
+            dump_data = download_result.remote(ds, filename="vf3_failed_dump.pt")
+            if dump_data:
+                with open("vf3_failed_dump.pt", "wb") as f:
+                    f.write(dump_data)
+                print("   ✓ Saved vf3_failed_dump.pt")
+        except Exception as e:
+            pass
 
     # Summary
     print("\n" + "=" * 60)

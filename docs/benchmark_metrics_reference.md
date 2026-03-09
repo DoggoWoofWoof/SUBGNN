@@ -10,10 +10,11 @@ flowchart LR
     E --> FC["2. Coarse FAISS"]
     FC --> FF["3. Fine FAISS"]
     FF --> ST["4. Stitch Partitions"]
-    ST --> VF["5. VF2 Verify"]
+    ST --> VF["5. C++ Solver Verify"]
     ST --> GT["5b. GT Metrics"]
-    Q --> BL["Baseline: Random 10K"]
-    BL --> BGT["Baseline GT Metrics"]
+    Q --> BL["Random Sampling"]
+    BL --> BGT["Random Sampling GT Metrics"]
+    Q --> FGS["Oracle: C++ Solver Verify (Full Graph)"]
     
     style E fill:#4a9eff,color:white
     style FC fill:#ff6b6b,color:white
@@ -23,6 +24,7 @@ flowchart LR
     style GT fill:#845ef7,color:white
     style BL fill:#868e96,color:white
     style BGT fill:#868e96,color:white
+    style FGS fill:#d9480f,color:white
 ```
 
 ---
@@ -92,7 +94,7 @@ After FAISS prediction, partition nodes are stitched into a candidate subgraph v
 | `stitched_nodes` | int | Total nodes in the final stitched graph (~21K on arxiv) |
 | `stitched_partitions` | list | Coarse partition IDs included in stitching |
 | `num_stitched` | int | Number of partitions stitched together |
-| `vf2_level_reached` | string | Expansion level reached: `top-1`, `top-5`, or `top-20` |
+| `solver_timed_out` | bool | Did the subgraph solver expansion hit a timeout limit? |
 
 ---
 
@@ -109,7 +111,7 @@ After FAISS prediction, partition nodes are stitched into a candidate subgraph v
 
 ---
 
-## 6. VF2 Subgraph Isomorphism
+## 6. C++ Subgraph Isomorphism
 
 *"Is the query **exactly** present as a subgraph?"*
 
@@ -117,21 +119,32 @@ After FAISS prediction, partition nodes are stitched into a candidate subgraph v
 
 | Column | Type | Description |
 |---|---|---|
-| `vf2_stitched_found` | bool | Did VF2 find an exact match? |
-| `vf2_stitched_solutions` | int | Number of isomorphic mappings found |
-| `vf2_stitched_time` | float (s) | Time spent on VF2 |
+| `solver_found` | bool | Did solver (e.g. DP-iso) find an exact match? |
+| `solver_solutions` | int | Number of isomorphic mappings found |
+| `solver_time` | float (s) | Time spent on C++ solver |
 
-### Baseline VF2
+### Random Sampling
 
 | Column | Type | Description |
 |---|---|---|
-| `vf2_baseline_found` | bool | Did VF2 find a match in random sample? |
-| `vf2_baseline_time` | float (s) | Time for all baseline VF2 attempts |
-| `vf2_baseline_attempts` | int | Retry attempts (up to 10) |
-| `vf2_baseline_sample_size` | int | Nodes per attempt (default: 10,000) |
+| `rs_solver_found` | bool | Did solver find a match in random sample? |
+| `rs_solver_time` | float (s) | Time for all random sampling solver attempts |
+| `rs_solver_attempts` | int | Retry attempts (up to 10) |
+| `rs_solver_sample_size` | int | Nodes per attempt (default: 10,000) |
+
+### Oracle Match (Full Graph)
+
+Executes the identical native C++ solver over the unpartitioned global target graph as an absolute upper bound validation.
+
+| Column | Type | Description |
+|---|---|---|
+| `full_graph_solver_found` | bool | Did solver find an exact match in the original graph? |
+| `full_graph_solver_solutions` | int | Number of mappings found globally |
+| `full_graph_solver_best_accuracy` | float | Maximum topological match accuracy achievable |
+| `full_graph_solver_time` | float (s) | Total processing latency for the unpartitioned scale |
 
 > [!NOTE]
-> On ogbn-arxiv, VF2 achieves **0% success** for both methods — stitched graphs (~21K nodes) are too large for exact matching in the time limit.
+> On ogbn-arxiv, exact matching algorithms often achieve **0% success** — exact matching is NP-Hard and stitched graphs (~21K nodes) can be too large for strictly induced exact verification in the time limit unless carefully handled.
 
 ---
 
@@ -165,21 +178,21 @@ After FAISS prediction, partition nodes are stitched into a candidate subgraph v
 
 ---
 
-## 8. Baseline Ground-Truth Metrics
+## 8. Random Sampling Ground-Truth Metrics
 
-Random sampling baseline: pick random anchor → k-hop expand to ~10K nodes → compute overlap with query. Best result across 10 retries is kept.
+Random sampling: pick random anchor → k-hop expand to ~10K nodes → compute overlap with query. Best result across 10 retries is kept.
 
 | Column | Type | Description |
 |---|---|---|
-| `baseline_node_precision` | float [0,1] | `\|sampled ∩ query\| / \|sampled\|` |
-| `baseline_node_recall` | float [0,1] | `\|sampled ∩ query\| / \|query\|` |
-| `baseline_node_f1` | float [0,1] | Harmonic mean |
-| `baseline_gt_partition_recall` | float [0,1] | Fraction of true partitions covered by sample |
-| `baseline_all_gt_found` | bool | All true partitions covered? |
-| `baseline_contains_query` | bool | Are **all** query nodes in the sample? |
+| `rs_node_precision` | float [0,1] | `\|sampled ∩ query\| / \|sampled\|` |
+| `rs_node_recall` | float [0,1] | `\|sampled ∩ query\| / \|query\|` |
+| `rs_node_f1` | float [0,1] | Harmonic mean |
+| `rs_gt_partition_recall` | float [0,1] | Fraction of true partitions covered by sample |
+| `rs_all_gt_found` | bool | All true partitions covered? |
+| `rs_contains_query` | bool | Are **all** query nodes in the sample? |
 
 > [!TIP]
-> Baseline partition recall is high (~94%) because random 10K nodes span many partitions. But baseline **node recall is only ~25%** — it covers partitions without finding the query nodes. Jigsaw achieves **90.9% node recall** (3.6× better).
+> Random sampling partition recall is high (~94%) because random 10K nodes span many partitions. But random sampling **node recall is only ~25%** — it covers partitions without finding the query nodes. Jigsaw achieves **90.9% node recall** (3.6× better).
 
 ---
 
@@ -188,9 +201,10 @@ Random sampling baseline: pick random anchor → k-hop expand to ~10K nodes → 
 | Column | Type | Description | Typical |
 |---|---|---|---|
 | `embed_time` | float (s) | GNN encoder inference | ~7ms |
+| `hashing_time` | float (s) | Discretizing graph features to C++ labels | ~0.5s |
 | `faiss_time` | float (s) | FAISS nearest-neighbor search | ~0.3ms |
-| `vf2_time` | float (s) | Total VF2 time (dominates) | ~1.1s |
-| `total_time` | float (s) | End-to-end pipeline | ~1.13s |
+| `solver_time` | float (s) | Total C++ exact solver time | ~1.1s |
+| `total_time` | float (s) | End-to-end pipeline | ~1.63s |
 
 ---
 
@@ -201,8 +215,8 @@ Random sampling baseline: pick random anchor → k-hop expand to ~10K nodes → 
 | Can the model find the right partition? | `coarse_correct` (Coarse@1) |
 | How many true partitions are retrieved? | `gt_partition_recall` |
 | Are the actual query nodes recovered? | `recall` (Node Recall) |
-| Is our method better than random? | `recall` vs `baseline_node_recall` |
-| Is there an exact subgraph match? | `vf2_stitched_found` |
+| Are our extracted partitions better than random sampling? | `recall` vs `rs_node_recall` |
+| Is there an exact subgraph match? | `solver_found` |
 | How fast is the pipeline? | `total_time` |
 
 ## 11. Special Values
