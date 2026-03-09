@@ -1,0 +1,245 @@
+
+======================================================================
+EVALUATION SUMMARY
+======================================================================
+
+--- K_HOP ---
+  Total queries:       30
+  Successful:          30
+  Coarse Recall@1:     90.0%
+  Coarse Recall@K:     100.0%
+  GT Partition Recall: 30.7%
+  All GT Parts Found:  0.0%
+  Recall@1:            4.3%
+  Recall@5:            19.9%
+  Recall@20:           30.7%
+  Solver Stitched Match: 0.00% (Our Method)
+  Solver Stitched First Acc: -1.00%
+  Solver Stitched Time-to-First: -1000.000ms
+  Solver Stitched Best Acc: -1.00%
+  --- Oracle (Full Graph) ---
+    Solver Full Graph:   100.00%
+    Full Graph First Acc: 91.60%
+    Full Graph Time-to-First: 1.257ms
+    Full Graph Best Acc: 91.87%
+    Full Graph Avg Latency: 37464.361ms
+  Solver Random Sampling Match:   10.00% (Random Sampling)
+  --- Random Sampling ---
+    Node Recall:       38.70%
+    Node Precision:    0.39%
+    Node F1:           0.77%
+    GT Part. Recall:   96.24%
+    Contains Query:    0.00%
+    Avg Latency:       471310.822ms
+  Avg Query Nodes:     100
+  Avg Stitched Nodes:  21128
+  Avg Partitions:      21.0
+  --- Latency Breakdown ---
+    Total Avg Latency:   200044.920ms
+      - Embedding:       10.914ms
+      - Hashing:         1315.578ms
+      - FAISS:           0.860ms
+      - Solver:          162507.203ms
+
+--- SINGLE ---
+  Total queries:       30
+  Successful:          30
+  Coarse Recall@1:     80.0%
+  Coarse Recall@K:     100.0%
+  GT Partition Recall: 100.0%
+  All GT Parts Found:  100.0%
+  Recall@1:            80.0%
+  Recall@5:            90.0%
+  Recall@20:           100.0%
+  Solver Stitched Match: 100.00% (Our Method)
+  Solver Stitched First Acc: 98.88%
+  Solver Stitched Time-to-First: 8.534ms
+  Solver Stitched Best Acc: 100.00%
+  --- Oracle (Full Graph) ---
+    Solver Full Graph:   100.00%
+    Full Graph First Acc: 96.28%
+    Full Graph Time-to-First: 0.480ms
+    Full Graph Best Acc: 98.84%
+    Full Graph Avg Latency: 37368.623ms
+  Solver Random Sampling Match:   50.00% (Random Sampling)
+  --- Random Sampling ---
+    Node Recall:       13.00%
+    Node Precision:    0.06%
+    Node F1:           0.11%
+    GT Part. Recall:   70.00%
+    Contains Query:    0.00%
+    Avg Latency:       272947.666ms
+  Avg Query Nodes:     46
+  Avg Stitched Nodes:  3472
+  Avg Partitions:      3.5
+  --- Latency Breakdown ---
+    Total Avg Latency:   128968.401ms
+      - Embedding:       7.629ms
+      - Hashing:         198.908ms
+      - FAISS:           0.822ms
+      - Solver:          91531.880ms
+
+--- SIBLING_WALK ---
+  Total queries:       30
+  Successful:          30
+  Coarse Recall@1:     90.0%
+  Coarse Recall@K:     100.0%
+  GT Partition Recall: 100.0%
+  All GT Parts Found:  100.0%
+  Recall@1:            90.0%
+  Recall@5:            100.0%
+  Recall@20:           100.0%
+  Solver Stitched Match: 100.00% (Our Method)
+  Solver Stitched First Acc: 96.78%
+  Solver Stitched Time-to-First: 4.947ms
+  Solver Stitched Best Acc: 98.13%
+  --- Oracle (Full Graph) ---
+    Solver Full Graph:   100.00%
+    Full Graph First Acc: 94.46%
+    Full Graph Time-to-First: 0.847ms
+    Full Graph Best Acc: 96.37%
+    Full Graph Avg Latency: 36604.023ms
+  Solver Random Sampling Match:   20.00% (Random Sampling)
+  --- Random Sampling ---
+    Node Recall:       11.63%
+    Node Precision:    0.11%
+    Node F1:           0.21%
+    GT Part. Recall:   70.00%
+    Contains Query:    0.00%
+    Avg Latency:       434489.963ms
+  Avg Query Nodes:     78
+  Avg Stitched Nodes:  1493
+  Avg Partitions:      1.5
+  --- Latency Breakdown ---
+    Total Avg Latency:   181768.338ms
+      - Embedding:       5.642ms
+      - Hashing:         79.992ms
+      - FAISS:           0.729ms
+      - Solver:          145101.065ms
+
+--- MULTI_COARSE ---
+  Total queries:       30
+  Successful:          30
+  Coarse Recall@1:     80.0%
+  Coarse Recall@K:     100.0%
+  GT Partition Recall: 42.5%
+  All GT Parts Found:  10.0%
+  Recall@1:            16.4%
+  Recall@5:            33.1%
+  Recall@20:           47.0%
+  Solver Stitched Match: 80.00% (Our Method)
+  Solver Stitched First Acc: 70.55%
+  Solver Stitched Time-to-First: -191.547ms
+  Solver Stitched Best Acc: 72.38%
+  --- Oracle (Full Graph) ---
+    Solver Full Graph:   100.00%
+    Full Graph First Acc: 80.97%
+    Full Graph Time-to-First: 0.633ms
+    Full Graph Best Acc: 82.67%
+    Full Graph Avg Latency: 35243.271ms
+  Solver Random Sampling Match:   70.00% (Random Sampling)
+  --- Random Sampling ---
+    Node Recall:       12.03%
+    Node Precision:    0.05%
+    Node F1:           0.11%
+    GT Part. Recall:   67.50%
+    Contains Query:    0.00%
+    Avg Latency:       204386.544ms
+  Avg Query Nodes:     40
+  Avg Stitched Nodes:  9375
+  Avg Partitions:      9.5
+  --- Latency Breakdown ---
+    Total Avg Latency:   105212.544ms
+      - Embedding:       5.750ms
+      - Hashing:         504.138ms
+      - FAISS:           0.715ms
+      - Solver:          69906.997ms
+
+--- OVERALL ---
+  Total queries:       120
+  Successful:          120
+  Coarse Recall@1:     85.0%
+  Coarse Recall@K:     100.0%
+  GT Partition Recall: 68.3%
+  All GT Parts Found:  52.5%
+  Recall@1:            47.7%
+  Recall@5:            60.7%
+  Recall@20:           69.4%
+  Solver Stitched Match: 70.00% (Our Method)
+  Solver Stitched First Acc: 66.30%
+  Solver Stitched Time-to-First: -294.516ms
+  Solver Stitched Best Acc: 67.38%
+  --- Oracle (Full Graph) ---
+    Solver Full Graph:   100.00%
+    Full Graph First Acc: 90.83%
+    Full Graph Time-to-First: 0.804ms
+    Full Graph Best Acc: 92.44%
+    Full Graph Avg Latency: 36670.069ms
+  --- Random Sampling ---
+    Node Recall:       18.84%
+    Node Precision:    0.15%
+    Node F1:           0.30%
+    GT Part. Recall:   75.93%
+    Contains Query:    0.00%
+    Avg Latency:       345783.749ms
+  Avg Query Nodes:     66
+  Avg Stitched Nodes:  8867
+  --- Latency Breakdown ---
+    Total Avg Latency:   153998.551ms
+      - Embedding:       7.483ms
+      - Hashing:         524.654ms
+      - FAISS:           0.781ms
+      - Solver:          117261.786ms
+
+======================================================================
+SOLVER COMPARISON
+======================================================================
+
+--- OUR METHOD (Stitched Partition Subgraph) ---
+  [DPISO]
+    Match Rate:        70.00%
+    Best Accuracy:     67.38%
+    First Accuracy:    66.26%
+    Time to First:     -296.581ms
+    Total Solver Time: 347771.594ms
+    Avg Expansion Lvl: 8.35
+
+  [CFL]
+    Match Rate:        70.00%
+    Best Accuracy:     67.38%
+    First Accuracy:    66.54%
+    Time to First:     -293.027ms
+    Total Solver Time: 2021.968ms
+    Avg Expansion Lvl: 8.35
+
+  [TURBOISO]
+    Match Rate:        70.00%
+    Best Accuracy:     67.38%
+    First Accuracy:    66.11%
+    Time to First:     -293.941ms
+    Total Solver Time: 1991.797ms
+    Avg Expansion Lvl: 8.35
+
+
+--- ORACLE (Full Graph Search) ---
+  [DPISO]
+    Match Rate:        100.00%
+    Best Accuracy:     91.47%
+    First Accuracy:    89.78%
+    Time to First:     0.845ms
+    Total Solver Time: 677.874ms
+
+  [CFL]
+    Match Rate:        100.00%
+    Best Accuracy:     94.47%
+    First Accuracy:    93.04%
+    Time to First:     0.790ms
+    Total Solver Time: 691.605ms
+
+  [TURBOISO]
+    Match Rate:        100.00%
+    Best Accuracy:     91.37%
+    First Accuracy:    89.66%
+    Time to First:     0.777ms
+    Total Solver Time: 682.828ms
+
