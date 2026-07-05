@@ -38,7 +38,12 @@ def run_pymetis_in_subprocess(n_parts, xadj, adjncy):
 
 def convert_hetero_to_homo(hetero_data: HeteroData) -> Data:
     """
-    Convert OGBN-MAG HeteroData -> homogeneous Data
+    Convert OGBN-MAG HeteroData -> homogeneous Data.
+
+    Paper nodes keep their OGB features. Other node types do not have raw OGB
+    features, so we append node-type one-hot features plus per-relation degree
+    features. This keeps author/institution/field nodes distinguishable without
+    introducing a separate heterogeneous GNN path.
     """
     print("  - Converting heterogeneous graph to homogeneous...")
     node_types = list(hetero_data.num_nodes_dict.keys())
@@ -47,33 +52,77 @@ def convert_hetero_to_homo(hetero_data: HeteroData) -> Data:
         node_offset[nt] = total_nodes
         total_nodes += hetero_data.num_nodes_dict[nt]
 
-    # Handle case where paper features might be missing or different in other datasets
-    # Defaulting to paper features size if available
-    if "paper" in hetero_data.x_dict:
-        feat_dim = hetero_data.x_dict["paper"].size(1)
-        x = torch.zeros(total_nodes, feat_dim, dtype=torch.float)
-        p_start, p_end = node_offset["paper"], node_offset["paper"] + hetero_data.num_nodes_dict["paper"]
-        x[p_start:p_end] = hetero_data.x_dict["paper"]
-    else:
-        # Fallback for empty features or different schema
-        x = torch.zeros(total_nodes, 128, dtype=torch.float) # Placeholder
-
     node_type_ids = torch.zeros(total_nodes, dtype=torch.long)
+    type_features = torch.zeros(total_nodes, len(node_types), dtype=torch.float)
     for i, nt in enumerate(node_types):
         s, e = node_offset[nt], node_offset[nt] + hetero_data.num_nodes_dict[nt]
         node_type_ids[s:e] = i
+        type_features[s:e, i] = 1.0
+
+    if "paper" in hetero_data.x_dict:
+        feat_dim = hetero_data.x_dict["paper"].size(1)
+        base_x = torch.zeros(total_nodes, feat_dim, dtype=torch.float)
+        p_start, p_end = node_offset["paper"], node_offset["paper"] + hetero_data.num_nodes_dict["paper"]
+        base_x[p_start:p_end] = hetero_data.x_dict["paper"].float()
+    else:
+        base_x = torch.zeros(total_nodes, 128, dtype=torch.float)
 
     all_ei = []
-    for (src_t, rel, dst_t), ei in hetero_data.edge_index_dict.items():
-        gei = ei.clone(); gei[0] += node_offset[src_t]; gei[1] += node_offset[dst_t]
+    all_edge_type = []
+    edge_types = list(hetero_data.edge_index_dict.keys())
+    rel_degree = torch.zeros(total_nodes, max(1, 2 * len(edge_types)), dtype=torch.float)
+    for rel_id, (edge_key, ei) in enumerate(hetero_data.edge_index_dict.items()):
+        src_t, rel, dst_t = edge_key
+        gei = ei.clone()
+        gei[0] += node_offset[src_t]
+        gei[1] += node_offset[dst_t]
         all_ei.append(gei)
+        all_edge_type.append(torch.full((gei.size(1),), rel_id, dtype=torch.long))
+
+        ones = torch.ones(gei.size(1), dtype=torch.float)
+        rel_degree[:, 2 * rel_id].index_add_(0, gei[0], ones)
+        rel_degree[:, 2 * rel_id + 1].index_add_(0, gei[1], ones)
 
     edge_index = torch.cat(all_ei, dim=1) if all_ei else torch.empty((2, 0), dtype=torch.long)
+    edge_type = torch.cat(all_edge_type, dim=0) if all_edge_type else torch.empty((0,), dtype=torch.long)
+    rel_degree = torch.log1p(rel_degree)
+    rel_degree = rel_degree / rel_degree.clamp_min(1.0).amax(dim=0, keepdim=True)
+    x = torch.cat([base_x, type_features, rel_degree], dim=1).contiguous()
 
     homo = Data(x=x, edge_index=edge_index, num_nodes=total_nodes)
-    homo.node_type = node_type_ids; homo.node_types = node_types
-    homo.node_offset = node_offset; homo.global_id = torch.arange(total_nodes, dtype=torch.long)
-    print(f"    - Converted to homogeneous: {homo.num_nodes} nodes, {homo.edge_index.size(1)} edges")
+    homo.node_type = node_type_ids
+    homo.node_types = node_types
+    homo.node_offset = node_offset
+    homo.edge_type = edge_type
+    homo.edge_types = edge_types
+    homo.feature_schema = "mag_type_rel_v1"
+    homo.global_id = torch.arange(total_nodes, dtype=torch.long)
+    paper_y = None
+    if hasattr(hetero_data, "y_dict") and "paper" in hetero_data.y_dict:
+        paper_y = hetero_data.y_dict["paper"]
+    elif hasattr(hetero_data, "node_stores"):
+        paper_store = next(
+            (
+                store
+                for store in hetero_data.node_stores
+                if getattr(store, "_key", None) == "paper"
+            ),
+            None,
+        )
+        if paper_store is not None and hasattr(paper_store, "y"):
+            paper_y = paper_store.y
+    if paper_y is not None:
+        y = torch.full((total_nodes,), -1, dtype=paper_y.dtype)
+        p_start = node_offset["paper"]
+        p_end = p_start + hetero_data.num_nodes_dict["paper"]
+        y[p_start:p_end] = paper_y.view(-1)
+        homo.y = y
+    print(
+        f"    - Converted to homogeneous: {homo.num_nodes} nodes, "
+        f"{homo.edge_index.size(1)} edges, {homo.x.size(1)} features "
+        f"(paper + type + relation-degree)",
+        flush=True,
+    )
     return homo
 
 def make_undirected_fast(edge_index, num_nodes):
@@ -88,6 +137,21 @@ def make_undirected_fast(edge_index, num_nodes):
         print(f"    - SparseTensor symmetrization failed ({e}), falling back to slow utils...")
         from torch_geometric.utils import to_undirected
         return to_undirected(edge_index, num_nodes=num_nodes)
+
+
+def make_undirected_with_edge_type(edge_index, edge_type, num_nodes):
+    """Symmetrize edges while assigning reverse relation ids."""
+    if edge_type is None or edge_type.numel() != edge_index.size(1):
+        full_edge_index = make_undirected_fast(edge_index, num_nodes)
+        return full_edge_index, torch.zeros(full_edge_index.size(1), dtype=torch.long), 1
+    edge_type = edge_type.detach().cpu().long()
+    edge_index = edge_index.detach().cpu().long()
+    base_relations = int(edge_type.max().item()) + 1 if edge_type.numel() else 1
+    reverse_edge_index = torch.stack([edge_index[1], edge_index[0]], dim=0)
+    reverse_edge_type = edge_type + base_relations
+    full_edge_index = torch.cat([edge_index, reverse_edge_index], dim=1).contiguous()
+    full_edge_type = torch.cat([edge_type, reverse_edge_type], dim=0).contiguous()
+    return full_edge_index, full_edge_type, base_relations * 2
 
 def make_partitions(dataset, num_parts, keep_features=True):
     
@@ -142,13 +206,22 @@ def make_partitions(dataset, num_parts, keep_features=True):
             
             # Manual Data construction to avoid implicit subgraph issues and ensure correct relabeling
             try:
-                relabeled_edge_index, _ = subgraph(nodes_tensor, dataset.edge_index, relabel_nodes=True, num_nodes=dataset.num_nodes)
+                relabeled_edge_index, _, edge_mask = subgraph(
+                    nodes_tensor,
+                    dataset.edge_index,
+                    relabel_nodes=True,
+                    num_nodes=dataset.num_nodes,
+                    return_edge_mask=True,
+                )
             except Exception:
                 # Fallback
                 relabeled_edge_index = torch.empty((2,0), dtype=torch.long, device=dataset.edge_index.device)
+                edge_mask = None
             
             part_data = Data(edge_index=relabeled_edge_index, num_nodes=len(nodes_tensor))
             part_data.part_id = part_id
+            if edge_mask is not None and hasattr(dataset, "edge_type") and dataset.edge_type is not None:
+                part_data.edge_type = dataset.edge_type[edge_mask].detach().cpu().long()
             
             # Copy attributes manually to be safe
             if keep_features:
@@ -167,7 +240,7 @@ def make_partitions(dataset, num_parts, keep_features=True):
                     part_data.node_type = dataset.node_type[nodes_tensor]
             
             # Copy global metadata that doesn't need slicing
-            for global_attr in ['node_types', 'node_offset', 'edge_types', 'edge_offset']:
+            for global_attr in ['node_types', 'node_offset', 'edge_types', 'edge_offset', 'feature_schema']:
                 if hasattr(dataset, global_attr):
                     setattr(part_data, global_attr, getattr(dataset, global_attr))
 
@@ -351,6 +424,54 @@ def load_dataset(name: str, root: str = "/tmp"):
         # Symmetrize to prevent Metis crash
         data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
         return data
+
+    elif name == 'pubmed':
+        from torch_geometric.datasets import Planetoid
+        dataset = Planetoid(root=f"{root}/PubMed", name="PubMed")
+        data = dataset[0]
+        if not hasattr(data, 'node_types'):
+            data.node_types = ['paper']
+            data.node_type = torch.zeros(data.num_nodes, dtype=torch.long)
+        if not hasattr(data, 'global_id'):
+            data.global_id = torch.arange(data.num_nodes)
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
+        return data
+
+    elif name == 'citeseer':
+        from torch_geometric.datasets import Planetoid
+        dataset = Planetoid(root=f"{root}/CiteSeer", name="CiteSeer")
+        data = dataset[0]
+        if not hasattr(data, 'node_types'):
+            data.node_types = ['paper']
+            data.node_type = torch.zeros(data.num_nodes, dtype=torch.long)
+        if not hasattr(data, 'global_id'):
+            data.global_id = torch.arange(data.num_nodes)
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
+        return data
+
+    elif name == 'physics':
+        from torch_geometric.datasets import Coauthor
+        dataset = Coauthor(root=f"{root}/CoauthorPhysics", name="Physics")
+        data = dataset[0]
+        if not hasattr(data, 'node_types'):
+            data.node_types = ['paper']
+            data.node_type = torch.zeros(data.num_nodes, dtype=torch.long)
+        if not hasattr(data, 'global_id'):
+            data.global_id = torch.arange(data.num_nodes)
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
+        return data
+
+    elif name == 'flickr':
+        from torch_geometric.datasets import Flickr
+        dataset = Flickr(root=f"{root}/Flickr")
+        data = dataset[0]
+        if not hasattr(data, 'node_types'):
+            data.node_types = ['image']
+            data.node_type = torch.zeros(data.num_nodes, dtype=torch.long)
+        if not hasattr(data, 'global_id'):
+            data.global_id = torch.arange(data.num_nodes)
+        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
+        return data
     
     elif name == 'arxiv':
         from ogb.nodeproppred import PygNodePropPredDataset
@@ -390,12 +511,16 @@ def load_dataset(name: str, root: str = "/tmp"):
         
         dataset = PygNodePropPredDataset(name="ogbn-mag", root=f"{root}/ogbn_mag")
         data = convert_hetero_to_homo(dataset[0])
-        # Symmetrize to prevent Metis crash
-        data.edge_index = make_undirected_fast(data.edge_index, data.num_nodes)
+        data.edge_index, data.edge_type, data.num_edge_types = make_undirected_with_edge_type(
+            data.edge_index, data.edge_type, data.num_nodes
+        )
         return data
     
     else:
-        raise ValueError(f"Unknown dataset: {name}. Supported: cora, arxiv, mag")
+        raise ValueError(
+            f"Unknown dataset: {name}. Supported: cora, arxiv, mag, "
+            "pubmed, citeseer, physics, flickr"
+        )
 
 
 def build_hierarchy(data, num_coarse: int, num_fine: int):

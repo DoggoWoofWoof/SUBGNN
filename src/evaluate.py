@@ -1107,22 +1107,30 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             if 'solver_found' in successful.columns:
                 sf = successful['solver_found'].mean() * 100
                 log(f"  Solver Stitched Match: {sf:.2f}% (Our Method)")
-            if 'solver_first_accuracy' in successful.columns:
-                log(f"  Solver Stitched First Acc: {successful['solver_first_accuracy'].mean():.2f}%")
-            if 'solver_time_to_first' in successful.columns:
-                log(f"  Solver Stitched Time-to-First: {successful['solver_time_to_first'].mean()*1000:.3f}ms")
-            if 'solver_best_accuracy' in successful.columns:
-                log(f"  Solver Stitched Best Acc: {successful['solver_best_accuracy'].mean():.2f}%")
+            
+            # Filter for queries where solver actually found a solution for accuracy/timing metrics
+            matched = successful[successful.get('solver_found', False) == True]
+            if len(matched) > 0:
+                if 'solver_first_accuracy' in matched.columns:
+                    log(f"  Solver Stitched First Acc: {matched['solver_first_accuracy'].mean():.2f}%")
+                if 'solver_time_to_first' in matched.columns:
+                    log(f"  Solver Stitched Time-to-First: {matched['solver_time_to_first'].mean()*1000:.3f}ms")
+                if 'solver_best_accuracy' in matched.columns:
+                    log(f"  Solver Stitched Best Acc: {matched['solver_best_accuracy'].mean():.2f}%")
+            
             if 'full_graph_solver_found' in successful.columns:
                 log(f"  --- Oracle (Full Graph) ---")
                 fg_found = successful['full_graph_solver_found'].mean()*100
                 log(f"    Solver Full Graph:   {fg_found:.2f}%")
-            if 'full_graph_solver_first_accuracy' in successful.columns:
-                log(f"    Full Graph First Acc: {successful['full_graph_solver_first_accuracy'].mean():.2f}%")
-            if 'full_graph_time_to_first' in successful.columns:
-                log(f"    Full Graph Time-to-First: {successful['full_graph_time_to_first'].mean()*1000:.3f}ms")
-            if 'full_graph_solver_best_accuracy' in successful.columns:
-                log(f"    Full Graph Best Acc: {successful['full_graph_solver_best_accuracy'].mean():.2f}%")
+                
+                fg_matched = successful[successful.get('full_graph_solver_found', False) == True]
+                if len(fg_matched) > 0:
+                    if 'full_graph_solver_first_accuracy' in fg_matched.columns:
+                        log(f"    Full Graph First Acc: {fg_matched['full_graph_solver_first_accuracy'].mean():.2f}%")
+                    if 'full_graph_time_to_first' in fg_matched.columns:
+                        log(f"    Full Graph Time-to-First: {fg_matched['full_graph_time_to_first'].mean()*1000:.3f}ms")
+                    if 'full_graph_solver_best_accuracy' in fg_matched.columns:
+                        log(f"    Full Graph Best Acc: {fg_matched['full_graph_solver_best_accuracy'].mean():.2f}%")
             if 'full_graph_total_time' in successful.columns:
                 log(f"    Full Graph Avg Latency: {successful['full_graph_total_time'].mean()*1000:.3f}ms")
             if 'rs_solver_found' in successful.columns:
@@ -1178,21 +1186,29 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             log(f"  Recall@20:           {all_successful['recall_at_20'].mean()*100:.1f}%")
         if 'solver_found' in all_successful.columns:
             log(f"  Solver Stitched Match: {all_successful['solver_found'].mean()*100:.2f}% (Our Method)")
-        if 'solver_first_accuracy' in all_successful.columns:
-            log(f"  Solver Stitched First Acc: {all_successful['solver_first_accuracy'].mean():.2f}%")
-        if 'solver_time_to_first' in all_successful.columns:
-            log(f"  Solver Stitched Time-to-First: {all_successful['solver_time_to_first'].mean()*1000:.3f}ms")
-        if 'solver_best_accuracy' in all_successful.columns:
-            log(f"  Solver Stitched Best Acc: {all_successful['solver_best_accuracy'].mean():.2f}%")
+        
+        # Filter for overall matched
+        all_matched = all_successful[all_successful.get('solver_found', False) == True]
+        if len(all_matched) > 0:
+            if 'solver_first_accuracy' in all_matched.columns:
+                log(f"  Solver Stitched First Acc: {all_matched['solver_first_accuracy'].mean():.2f}%")
+            if 'solver_time_to_first' in all_matched.columns:
+                log(f"  Solver Stitched Time-to-First: {all_matched['solver_time_to_first'].mean()*1000:.3f}ms")
+            if 'solver_best_accuracy' in all_matched.columns:
+                log(f"  Solver Stitched Best Acc: {all_matched['solver_best_accuracy'].mean():.2f}%")
+                
         if 'full_graph_solver_found' in all_successful.columns:
             log(f"  --- Oracle (Full Graph) ---")
             log(f"    Solver Full Graph:   {all_successful['full_graph_solver_found'].mean()*100:.2f}%")
-        if 'full_graph_solver_first_accuracy' in all_successful.columns:
-            log(f"    Full Graph First Acc: {all_successful['full_graph_solver_first_accuracy'].mean():.2f}%")
-        if 'full_graph_time_to_first' in all_successful.columns:
-            log(f"    Full Graph Time-to-First: {all_successful['full_graph_time_to_first'].mean()*1000:.3f}ms")
-        if 'full_graph_solver_best_accuracy' in all_successful.columns:
-            log(f"    Full Graph Best Acc: {all_successful['full_graph_solver_best_accuracy'].mean():.2f}%")
+            
+            fg_all_matched = all_successful[all_successful.get('full_graph_solver_found', False) == True]
+            if len(fg_all_matched) > 0:
+                if 'full_graph_solver_first_accuracy' in fg_all_matched.columns:
+                    log(f"    Full Graph First Acc: {fg_all_matched['full_graph_solver_first_accuracy'].mean():.2f}%")
+                if 'full_graph_time_to_first' in fg_all_matched.columns:
+                    log(f"    Full Graph Time-to-First: {fg_all_matched['full_graph_time_to_first'].mean()*1000:.3f}ms")
+                if 'full_graph_solver_best_accuracy' in fg_all_matched.columns:
+                    log(f"    Full Graph Best Acc: {fg_all_matched['full_graph_solver_best_accuracy'].mean():.2f}%")
         if 'full_graph_total_time' in all_successful.columns:
             log(f"    Full Graph Avg Latency: {all_successful['full_graph_total_time'].mean()*1000:.3f}ms")
         if 'rs_node_recall' in all_successful.columns and all_successful['rs_node_recall'].notna().any():
@@ -1232,10 +1248,18 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             if len(s_subset) == 0: continue
             
             log(f"  [{sname.upper()}]")
-            log(f"    Match Rate:        {s_subset['solver_found'].mean()*100:.2f}%")
-            log(f"    Best Accuracy:     {s_subset['solver_best_accuracy'].mean():.2f}%")
-            log(f"    First Accuracy:    {s_subset['solver_first_accuracy'].mean():.2f}%")
-            log(f"    Time to First:     {s_subset['solver_time_to_first'].mean()*1000:.3f}ms")
+            match_rate = s_subset['solver_found'].mean() * 100
+            log(f"    Match Rate:        {match_rate:.2f}%")
+            
+            s_matched = s_subset[s_subset['solver_found'] == True]
+            if len(s_matched) > 0:
+                log(f"    Best Accuracy:     {s_matched['solver_best_accuracy'].mean():.2f}%")
+                log(f"    First Accuracy:    {s_matched['solver_first_accuracy'].mean():.2f}%")
+                log(f"    Time to First:     {s_matched['solver_time_to_first'].mean()*1000:.3f}ms")
+            else:
+                log(f"    Best Accuracy:     N/A")
+                log(f"    First Accuracy:    N/A")
+                log(f"    Time to First:     N/A")
             log(f"    Total Solver Time: {s_subset['solver_total_time'].mean()*1000:.3f}ms")
             if 'solver_level_numeric' in s_subset.columns:
                 log(f"    Avg Expansion Lvl: {s_subset['solver_level_numeric'].mean():.2f}")
@@ -1248,13 +1272,21 @@ def print_evaluation_summary(df: pd.DataFrame, output_txt: str = None):
             for sname in solvers:
                 s_subset = actual_queries[(actual_queries['solver_name'] == sname) & (actual_queries['success'] == True)]
                 if len(s_subset) == 0: continue
-                
                 log(f"  [{sname.upper()}]")
-                log(f"    Match Rate:        {s_subset['full_graph_solver_found'].mean()*100:.2f}%")
-                log(f"    Best Accuracy:     {s_subset['full_graph_solver_best_accuracy'].mean():.2f}%")
-                log(f"    First Accuracy:    {s_subset['full_graph_solver_first_accuracy'].mean():.2f}%")
-                log(f"    Time to First:     {s_subset['full_graph_time_to_first'].mean()*1000:.3f}ms")
-                log(f"    Total Solver Time: {s_subset['full_graph_solver_time'].mean()*1000:.3f}ms")
+                fg_match_rate = s_subset['full_graph_solver_found'].mean() * 100
+                log(f"    Match Rate:        {fg_match_rate:.2f}%")
+                
+                fg_s_matched = s_subset[s_subset['full_graph_solver_found'] == True]
+                if len(fg_s_matched) > 0:
+                    log(f"    Best Accuracy:     {fg_s_matched['full_graph_solver_best_accuracy'].mean():.2f}%")
+                    log(f"    First Accuracy:    {fg_s_matched['full_graph_solver_first_accuracy'].mean():.2f}%")
+                    log(f"    Time to First:     {fg_s_matched['full_graph_time_to_first'].mean()*1000:.3f}ms")
+                else:
+                    log(f"    Best Accuracy:     N/A")
+                    log(f"    First Accuracy:    N/A")
+                    log(f"    Time to First:     N/A")
+                log(f"    Total Solver Time: {s_subset['full_graph_total_time'].mean()*1000:.3f}ms")
+
                 log("")
     
     # Save to text file if requested
@@ -1373,7 +1405,7 @@ def main():
                         help='Queries per partition (if None, auto-calc from --target_queries)')
     parser.add_argument('--target_queries', type=int, default=10,
                         help='Target total queries per query type (default: 10)')
-    parser.add_argument('--top_k', type=int, default=5)
+    parser.add_argument('--top_k', type=int, default=20)
     parser.add_argument('--output', type=str, default='evaluation_results.csv')
     parser.add_argument('--hierarchy_cache', type=str, default=None,
                         help='Path to cache/load hierarchy pickle (e.g., cache/cora_hierarchy.pkl)')
@@ -1410,34 +1442,12 @@ def main():
     
     # Load data and model
     from src.data import load_dataset, get_or_build_hierarchy
-    from src.model import NodeFeatureAugmentor
-    
     data = load_dataset(args.dataset)
-    
-    # MAG uses NodeFeatureAugmentor, Cora/Arxiv don't
-    TYPE_DIM = 16
-    NODE_DIM = 16
-    
-    if args.dataset == 'mag':
-        print("[INFO] Initializing NodeFeatureAugmentor for MAG...")
-        augmentor = NodeFeatureAugmentor(
-            num_nodes=data.num_nodes, 
-            num_types=len(data.node_types), 
-            type_dim=TYPE_DIM, 
-            node_dim=NODE_DIM
-        ).to(DEVICE)
-        base_feat_dim = data.x.size(1)
-        augmented_feat_dim = base_feat_dim + augmentor.added_dim
-    else:
-        print(f"[INFO] Skipping NodeFeatureAugmentor for {args.dataset}...")
-        augmentor = None  # No augmentor for Cora/Arxiv
-        base_feat_dim = data.x.size(1)
-        augmented_feat_dim = base_feat_dim
-    
-    print(f"[INFO] Base features: {base_feat_dim}, Model input dim: {augmented_feat_dim}")
+    base_feat_dim = data.x.size(1)
+    print(f"[INFO] Base features: {base_feat_dim}")
     
     encoder = ImprovedSubgraphEncoder(
-        in_neurons=augmented_feat_dim,
+        in_neurons=base_feat_dim,
         hidden_neurons=GIN_HIDDEN_NEURONS,
         output_neurons=GIN_OUTPUT_NEURONS
     ).to(DEVICE)
@@ -1454,20 +1464,9 @@ def main():
             # Assume the checkpoint IS the encoder state_dict
             encoder.load_state_dict(checkpoint)
         
-        # Load augmentor for MAG
-        if args.dataset == 'mag' and augmentor is not None:
-            if 'augmentor' in checkpoint:
-                augmentor.load_state_dict(checkpoint['augmentor'])
-            elif 'augmentor_state_dict' in checkpoint:
-                augmentor.load_state_dict(checkpoint['augmentor_state_dict'])
-            else:
-                print("[WARN] MAG checkpoint missing augmentor weights!")
-        
         print(f"[INFO] Loaded model from {args.model_path}")
     
     encoder.eval()
-    if augmentor is not None:
-        augmentor.eval()
     
     # Build hierarchy and context (with optional caching)
     cfg = PARTITION_CONFIGS.get(args.dataset, PARTITION_CONFIGS['default'])
@@ -1477,10 +1476,10 @@ def main():
     print("[INFO] Building FAISS index...")
     coarse_graphs = hierarchy['coarse_graphs']
     
-    # Helper to get embedding with optional augmentor
+    # Helper to get embedding
     # NOTE: Hierarchy graphs have x=None (keep_features=False for RAM saving)
     # We fetch features from original data using global_id
-    def embed_with_augmentor(g, encoder, device, augmentor=None, original_data=None):
+    def get_eval_embedding(g, encoder, device, original_data=None):
         """Get embedding, fetching features from original data if needed."""
         if g is None or g.num_nodes == 0:
             return torch.zeros(1, GIN_OUTPUT_NEURONS, device=device)
@@ -1497,22 +1496,6 @@ def main():
                 print(f"[WARN] Graph missing x and global_id, using zeros")
                 g.x = torch.zeros(g.num_nodes, original_data.x.size(1), device=device)
         
-        # Ensure node_type is present for augmentor (MAG)
-        if augmentor is not None and (not hasattr(g, 'node_type') or g.node_type is None):
-            if original_data is not None and hasattr(original_data, 'node_type') and original_data.node_type is not None:
-                if hasattr(g, 'global_id') and g.global_id is not None:
-                    # Move global_id to same device as original node_type for indexing
-                    g_ids = g.global_id.to(original_data.node_type.device) 
-                    g.node_type = original_data.node_type[g_ids].to(device)
-                else:
-                    # Fallback if no global_id? Assume identity?
-                    # This shouldn't happen for partitions.
-                    pass
-        
-        if augmentor is not None:
-            g = g.clone()
-            g.x = augmentor(g)
-        
         return get_graph_embedding(g, encoder, device)
     
     # Embed coarse graphs with progress bar (this can be slow on CPU)
@@ -1523,7 +1506,7 @@ def main():
     faiss_idx_to_coarse_id = {}  # Maps FAISS index -> actual coarse partition ID
     for coarse_id, g in enumerate(tqdm(coarse_graphs, desc="Embedding coarse partitions")):
         if g is not None:
-            emb = embed_with_augmentor(g, encoder, DEVICE, augmentor, data)
+            emb = get_eval_embedding(g, encoder, DEVICE, data)
             faiss_idx_to_coarse_id[len(coarse_embeds_list)] = coarse_id  # Map FAISS idx to coarse ID
             coarse_embeds_list.append(emb)
     coarse_embeds = torch.cat(coarse_embeds_list, dim=0)
@@ -1547,7 +1530,6 @@ def main():
         'faiss_coarse': faiss_coarse,
         'faiss_idx_to_coarse_id': faiss_idx_to_coarse_id,  # CRITICAL: Maps FAISS results to actual coarse IDs
         'num_coarse': len(coarse_graphs),
-        'augmentor': augmentor,  # Pass augmentor for MAG (None for others)
     }
     
     # Only build G_nx if needed (extremely slow for MAG's 1.9M nodes)

@@ -10,7 +10,7 @@ DATA_ROOT_MAG = "data/ogbn_mag"
 
 # Checkpoint Paths (Updated to match actual model locations)
 CHECKPOINT_CORA = "models/cora-6_layer-model-jigsaw.pth"
-CHECKPOINT_ARXIV = "models/arxiv-6_layer-model-jigsaw.pth"
+CHECKPOINT_ARXIV = "models/arxiv-6_layer-model-jigsaw_v3.pth"
 CHECKPOINT_MAG = "models/mag-6_layer-model-jigsaw.pth"
 
 # Model Hyperparameters
@@ -18,15 +18,15 @@ GIN_HIDDEN_NEURONS = 256
 GIN_OUTPUT_NEURONS = 128
 DROPOUT = 0.1
 
-# NodeFeatureAugmentor Dims (MAG only)
-TYPE_DIM = 16
-NODE_DIM = 16
-
 # Partitioning Targets (Dataset Specific)
 PARTITION_CONFIGS = {
-    'cora': {'coarse': 20, 'fine': 10},
-    'arxiv': {'coarse': 170, 'fine': 10},
-    'mag': {'coarse': 1997, 'fine': 10},
+    'cora': {'coarse': 20, 'fine': 5},
+    'arxiv': {'coarse': 200, 'fine': 5},
+    'mag': {'coarse': 2000, 'fine': 5},
+    'pubmed': {'coarse': 20, 'fine': 5},
+    'physics': {'coarse': 35, 'fine': 5},
+    'citeseer': {'coarse': 10, 'fine': 5},
+    'flickr': {'coarse': 100, 'fine': 5},
     'default': {'coarse': 100, 'fine': 10}
 }
 
@@ -35,7 +35,7 @@ FAISS_TOP_K = 20
 
 # Query Params
 QUERY_NODES_MIN = 20
-QUERY_NODES_MAX = 100
+QUERY_NODES_MAX = 20
 
 # Evaluation Query Counts (normalized across datasets)
 # Target total queries per query type (e.g., 100 k_hop, 100 single, etc.)

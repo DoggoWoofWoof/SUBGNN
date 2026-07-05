@@ -1,228 +1,155 @@
-# Jigsaw Benchmark Metrics Reference
+# Benchmark Metrics Reference
 
-Complete reference for all 43 columns in `arxiv_eval.csv`.
+This document describes the active Glasgow benchmark schema produced by `scripts/benchmark_glasgow.py`.
 
-## Pipeline Overview
+Canonical current paper CSVs live in `benchmarks/paper_results/`. New Modal runs are written to the Modal volume under `results/` and should be copied into a named benchmark release folder with a manifest before being used in the paper.
 
-```mermaid
-flowchart LR
-    Q["Query Subgraph"] --> E["1. Embed"]
-    E --> FC["2. Coarse FAISS"]
-    FC --> FF["3. Fine FAISS"]
-    FF --> ST["4. Stitch Partitions"]
-    ST --> VF["5. C++ Solver Verify"]
-    ST --> GT["5b. GT Metrics"]
-    Q --> BL["Random Sampling"]
-    BL --> BGT["Random Sampling GT Metrics"]
-    Q --> FGS["Oracle: C++ Solver Verify (Full Graph)"]
-    
-    style E fill:#4a9eff,color:white
-    style FC fill:#ff6b6b,color:white
-    style FF fill:#ff6b6b,color:white
-    style ST fill:#ffa94d,color:white
-    style VF fill:#51cf66,color:white
-    style GT fill:#845ef7,color:white
-    style BL fill:#868e96,color:white
-    style BGT fill:#868e96,color:white
-    style FGS fill:#d9480f,color:white
-```
+## Query Fields
 
----
+| Column | Meaning |
+| --- | --- |
+| `query_name` | Unique generated query label. |
+| `query_type` | One of `single`, `multi_fine`, `multi_coarse`, `k_hop`. |
+| `query_size` | Target query size requested for generation, usually 20, 50, or 100. |
+| `query_nodes` | Actual generated query node count. |
+| `true_coarse_indices` | Ground-truth coarse partitions touched by the query. |
+| `anchor_coarse_idx` | Minimum/anchor true coarse partition, used for grouping/debugging. |
+| `dataset` | Dataset key, e.g. `corafull`, `arxiv`, `pubmed`, `physics`, `citeseer`. |
 
-## 1. Identifiers & Metadata
+## Retrieval Fields
 
-| Column | Type | Description |
-|---|---|---|
-| `query_id` | string | Unique ID, e.g. `k_hop_0_0` (type_partition_index) |
-| `query_type` | string | Query category: `single`, `k_hop`, `sibling_walk`, `multi_coarse`, or `OVERALL` |
-| `anchor_coarse` | float | The coarse partition the query was sampled from |
-| `success` | bool | Whether the pipeline completed without errors |
-| `query_nodes` | int | Number of nodes in the query subgraph |
+For paper tables, prioritize `fullcov_at_k` / `retrieval_complete_at_k` over average recall. A single missed true partition can make exact verification impossible, so average `coarse_recall_at_k` is a secondary diagnostic rather than the main success criterion.
 
-### Query Types
+| Column | Meaning |
+| --- | --- |
+| `faiss_top_k` | Number of coarse partitions retrieved by FAISS for this run. |
+| `coarse_seed_k` | Seed retrieval budget used for FAISS top-K. In dynamic runs this is the initial retrieval budget, e.g. `20`, not the final expanded candidate budget. |
+| `coarse_score_k` | Optional deeper FAISS score pool used only for tie-breaking expansion, not as the headline seed retrieval budget. |
+| `coarse_score_pool_fullcov` | Whether the optional score pool contains all true coarse partitions. |
+| `coarse_score_pool_missed` | True coarse partitions missing from the score pool. |
+| `predicted_coarse_idx` | Top-1 coarse partition prediction. |
+| `correct_coarse_predicted` | Whether top-1 is in the true coarse partition set. |
+| `fullcov_at_k` | Primary retrieval metric: whether every true coarse partition is present in top-K. Alias of `retrieval_complete_at_k` in new benchmark CSVs. |
+| `retrieval_complete_at_k` | Backward-compatible name for FullCov@K. |
+| `coarse_recall_at_k` | Fraction of true coarse partitions retrieved within the configured `faiss_top_k`. |
+| `coarse_recall_at_20` | Recall@20 when `faiss_top_k >= 20`; otherwise `-1`. |
+| `predicted_fine_idx` | Top fine prediction inside the top coarse partition, or `-1` when unavailable. |
+| `true_fine_count` | Number of fine partitions touched by the query, when fine diagnostics are enabled. |
+| `true_fine_ranks` | Rank of each true fine partition inside the fine candidate pool. Missing entries use `-1`. |
+| `max_true_fine_rank` | Worst rank among found true fine partitions. Use with missed fields because missing true fine partitions are not counted in the max. |
+| `fine_candidate_pool_count` | Number of fine partitions considered inside the retrieved coarse pool for fine stitching. |
+| `fine_pool_fullcov` | Whether the full fine candidate pool contains every true fine partition. |
+| `boundary_expand_coarse_budget` | Maximum number of coarse partitions allowed after graph-boundary expansion from the seed set. |
+| `expanded_coarse_count` | Actual number of coarse partitions selected after boundary expansion. |
+| `expanded_coarse_fullcov` | Whether the dynamically expanded coarse candidate set contains all true coarse partitions. |
+| `expanded_missed_coarse` | True coarse partitions still missing after boundary expansion. |
+| `mc_dropout_passes` | Number of stochastic query-embedding passes used for MC-dropout retrieval diagnostics. |
+| `mc_dropout_top_k` | Per-pass top-K used for MC-dropout retrieval. |
+| `mc_dropout_seed_fullcov` | Whether the MC-dropout union seed contains all true coarse partitions. |
+| `mc_dropout_seed_missed` | True coarse partitions missing from the MC-dropout union seed. |
 
-| Type | What It Is | Partitions Spanned |
-|---|---|---|
-| `single` | Subgraph within one coarse partition | 1 coarse |
-| `sibling_walk` | Spans multiple **fine** partitions within the **same** coarse partition (uses `generate_multi_fine_partition_query`) | 1 coarse, 2–4 fine |
-| `multi_coarse` | Spans multiple **coarse** partitions via bridge edges | 2–5 coarse |
-| `k_hop` | k-hop neighborhood from random anchor, naturally crosses many partitions | Many (10–20 coarse) |
+## Verification Fields
 
----
+| Column | Meaning |
+| --- | --- |
+| `solver_mode` | `stitch` for Jigsaw retrieval plus Glasgow; `full` for full-graph Glasgow. |
+| `perfect_solution_found` | Whether Glasgow found at least one exact match in the target graph it was given. |
+| `first_solution_accuracy` | Accuracy of the first returned mapping against the planted query node IDs. |
+| `best_accuracy` | Best mapping accuracy among returned solutions. |
+| `solution_num_for_best_accuracy` | Number of solutions explored when the best accuracy was observed. |
+| `total_solutions_in_timeout` | Number of solutions returned before timeout/limit. |
+| `solver_level` | Retrieval expansion level that found the solution, e.g. `top-1`, `top-5`, `top-20`, `top-50`, or `none`. |
+| `stitched_nodes` | Number of nodes in the stitched candidate graph. |
+| `solver_timed_out` | Whether Glasgow timed out on the attempted target graph. |
+| `stitch_strategy` | Candidate construction strategy, e.g. `ranked`, `neighbor_rerank`, `coarse_boundary_expand`, `fine_ranked`, `fine_boundary`, or `fine_boundary_expand`. |
+| `candidate_fullcov` | Whether the actual candidate passed to Glasgow is complete. For coarse stitching this means all true coarse partitions are selected; for fine stitching this means all true fine partitions are selected. |
+| `candidate_coarse_fullcov` | Whether the candidate's selected coarse partitions cover all true coarse partitions. |
+| `candidate_fine_fullcov` | Whether the candidate's selected fine partitions cover all true fine partitions. |
+| `candidate_missed_coarse` | True coarse partitions missing from the candidate. |
+| `candidate_missed_fine` | True fine partitions missing from the candidate. |
+| `pre_prune_stitched_nodes` | Candidate node count before optional label-based pruning. |
+| `pruned_stitched_nodes` | Candidate node count after optional label-based pruning. |
+| `prune_target_by_query_labels` | Whether candidate target nodes were filtered to labels present in the query before Glasgow. |
+| `require_candidate_fullcov` | Whether solver execution was skipped until candidate FullCov was achieved. This is benchmark-only because real queries do not expose true partitions. |
 
-## 2. Partition Prediction (Coarse-Level)
+## Production Summary Fields
 
-*"Did the model identify which partition(s) the query belongs to?"*
+The paper-facing CSVs under `benchmarks/paper_results/final_results/` are
+grouped summaries, not raw per-budget rows. Each canonical production row is one
+dataset/seed/model/method/query-type/query-size cell with 50 generated queries.
 
-| Column | Type | Description |
-|---|---|---|
-| `predicted_coarse` | int | FAISS top-1 coarse partition prediction |
-| `coarse_correct` | bool | Is top-1 prediction in the true partition set? **(= Coarse@1)** |
-| `coarse_in_top_k` | bool | Is **any** true partition in the top-K (K=20) predictions? |
-| `coarse_recall_at_k` | float [0,1] | Fraction of true partitions found in top-K |
+| Column | Meaning |
+| --- | --- |
+| `queries` | Number of generated logical queries in the group, normally 50. |
+| `positive_queries` / `negative_queries` | Logical query polarity counts. Positive rows have planted matches; negative rows should return no match. |
+| `positive_solved` | Positive logical queries with at least one exact solution found in the candidate graph. |
+| `correct_no_match` | Negative logical queries with no solution and no timeout. |
+| `false_positives` | Negative logical queries where a solution was returned. This is the main false-match count. |
+| `timeouts` | Logical queries with at least one solver timeout across the budget sweep. |
+| `avg_total_s` | Per-query end-to-end candidate construction plus solver time, averaged over logical queries. |
+| `avg_candidate_nodes` | Candidate graph size after retrieval and pruning, averaged over logical queries. |
+| `solved_at_<B>` | Backward-compatible exact first-hit bucket: number of logical queries first solved exactly at budget `B`. |
+| `first_solved_at_<B>` | Explicit alias of `solved_at_<B>` for new analysis. |
+| `solved_by_<B>` | Cumulative count of logical queries solved by budget `B`; use this for budget-curve tables and paper text. |
 
-### Fine-Level Prediction
+Canonical summaries skip rolling `*_partial_per_query.csv` files by default.
+Partial files are checkpoints for Lightning resume and should not be mixed into
+paper tables unless a recovery audit explicitly asks for them.
 
-| Column | Type | Description |
-|---|---|---|
-| `predicted_fine` | int | FAISS top-1 fine partition prediction |
-| `fine_correct` | bool | Is top-1 fine prediction correct? |
-| `fine_in_top_k` | bool | Is any true fine partition in top-K? |
+## Timing Fields
 
----
+| Column | Meaning |
+| --- | --- |
+| `query_embedding_time` | Time to embed the query. |
+| `faiss_coarse_search_time` | Time for coarse FAISS retrieval. |
+| `faiss_fine_search_time` | Time for fine-level retrieval inside the top coarse partition. |
+| `time_to_first_solution` | Glasgow time to first solution when found. |
+| `time_to_best_solution` | Glasgow latency associated with the best returned mapping. |
+| `solver_time` | Total Glasgow verification time for this row. |
+| `total_time` | End-to-end row time including embedding, retrieval, stitching, and solving. |
+| `model_load_time` | One-time model loading time copied onto each row. |
+| `partition_time` | One-time hierarchy construction time copied onto each row. |
+| `faiss_build_time` | One-time FAISS index construction time copied onto each row. |
+| `solver_timeout` | Timeout used for each Glasgow call. |
 
-## 3. Recall@K (Partition-Level)
+## Interpreting Exactness
 
-*"How many of the true partitions appear in the top-K FAISS results?"*
+For `solver_mode=stitch`, Glasgow is exact inside the stitched candidate graph. The result is globally complete only if the stitched graph covers the true match region. For `solver_mode=full`, Glasgow is run on the whole graph and is the direct exact baseline where feasible.
 
-| Column | Type | Description |
-|---|---|---|
-| `recall_at_1` | float [0,1] | Fraction of true partitions in FAISS top-1 |
-| `recall_at_5` | float [0,1] | Fraction of true partitions in FAISS top-5 |
-| `recall_at_20` | float [0,1] | Fraction of true partitions in FAISS top-20 |
+K-hop queries should be interpreted as a bounded-retrieval stress test: they often span many coarse partitions, especially on Arxiv, so K sweeps are required to separate model retrieval quality from hard top-K capacity limits.
 
-**Example:** Query spans `{10, 20, 30, 40}`, FAISS top-5 = `{10, 15, 20, 25, 30}` → `recall_at_5` = 3/4 = 0.75
+`multi_coarse` in the current paper release is a disconnected multi-region
+diagnostic. It should not be used as the headline realistic connected
+cross-boundary query family. Future generated `multi_coarse` caches must pass
+the connected-query guard in `scripts/benchmark_overlap_glasgow_cascade.py`;
+stale disconnected caches are invalid for new production claims.
 
----
+For paper tables, label-pruned fine-boundary rows should be named explicitly.
+They demonstrate that exact verification becomes fast once candidate coverage is
+achieved, but they should not be described as pure retrieval without the pruning
+qualification.
 
-## 4. Stitching & Expansion
+## Training Objective Notes
 
-After FAISS prediction, partition nodes are stitched into a candidate subgraph via 3 expansion levels (top-1 → top-5 → top-20).
+`coverage_topk` is a training-only knob for the partition coverage loss. It adds
+a differentiable FullCov@K barrier on top of the all-positive coverage loss. For
+a row with `P` true coarse partitions, the loss pushes every positive partition
+above the negative threshold required for all `P` positives to fit inside the
+effective top-K.
 
-| Column | Type | Description |
-|---|---|---|
-| `stitched_nodes` | int | Total nodes in the final stitched graph (~21K on arxiv) |
-| `stitched_partitions` | list | Coarse partition IDs included in stitching |
-| `num_stitched` | int | Number of partitions stitched together |
-| `solver_timed_out` | bool | Did the subgraph solver expansion hit a timeout limit? |
+When `P` exceeds the requested `coverage_topk`, the effective K widens in
+buckets of 10: top-20 for rows that fit in 20, top-30 for rows needing 21-30
+partitions, top-40 for rows needing 31-40, and so on. This keeps broad k-hop
+training examples useful without asking for impossible FullCov@20.
 
----
+V6 adds `coverage_positive_aggregation`. `mean` preserves the older behavior;
+`cvar` averages only the worst configured fraction of required positives; and
+`smoothmax` is a differentiable approximation to the worst positive. Since one
+missed required partition makes FullCov false, `cvar` or `smoothmax` is more
+closely aligned with the paper's primary retrieval metric.
 
-## 5. Ground-Truth Partition Coverage
-
-*"After stitching, do we cover the true partitions?"*
-
-| Column | Type | Description |
-|---|---|---|
-| `gt_partitions_covered` | int | How many true partitions are in the stitched set |
-| `gt_partitions_total` | int | Total true partitions for this query |
-| `gt_partition_recall` | float [0,1] | **= covered / total** — key retrieval metric |
-| `all_gt_partitions_found` | bool | Whether ALL true partitions are covered |
-
----
-
-## 6. C++ Subgraph Isomorphism
-
-*"Is the query **exactly** present as a subgraph?"*
-
-### Our Method (Stitched)
-
-| Column | Type | Description |
-|---|---|---|
-| `solver_found` | bool | Did solver (e.g. DP-iso) find an exact match? |
-| `solver_solutions` | int | Number of isomorphic mappings found |
-| `solver_time` | float (s) | Time spent on C++ solver |
-
-### Random Sampling
-
-| Column | Type | Description |
-|---|---|---|
-| `rs_solver_found` | bool | Did solver find a match in random sample? |
-| `rs_solver_time` | float (s) | Time for all random sampling solver attempts |
-| `rs_solver_attempts` | int | Retry attempts (up to 10) |
-| `rs_solver_sample_size` | int | Nodes per attempt (default: 10,000) |
-
-### Oracle Match (Full Graph)
-
-Executes the identical native C++ solver over the unpartitioned global target graph as an absolute upper bound validation.
-
-| Column | Type | Description |
-|---|---|---|
-| `full_graph_solver_found` | bool | Did solver find an exact match in the original graph? |
-| `full_graph_solver_solutions` | int | Number of mappings found globally |
-| `full_graph_solver_best_accuracy` | float | Maximum topological match accuracy achievable |
-| `full_graph_solver_time` | float (s) | Total processing latency for the unpartitioned scale |
-
-> [!NOTE]
-> On ogbn-arxiv, exact matching algorithms often achieve **0% success** — exact matching is NP-Hard and stitched graphs (~21K nodes) can be too large for strictly induced exact verification in the time limit unless carefully handled.
-
----
-
-## 7. Node-Level Quality ⭐
-
-*"How well do the retrieved nodes overlap with the actual query nodes?"*
-
-### Our Method (FAISS Retrieval)
-
-| Column | Type | Formula | Description |
-|---|---|---|---|
-| `precision` | float [0,1] | `\|retrieved ∩ query\| / \|retrieved\|` | Fraction of retrieved nodes that are relevant |
-| `recall` | float [0,1] | `\|retrieved ∩ query\| / \|query\|` | Fraction of query nodes that were retrieved |
-| `f1` | float [0,1] | `2·P·R / (P+R)` | Harmonic mean |
-
-### Why Precision is Low (~0.3%) — This is Expected
-
-- Stitched graph: ~21,000 nodes (all nodes from ~20 partitions)
-- Query: ~45–96 nodes
-- Best possible precision: 96/21000 ≈ 0.46%
-- **Recall is the meaningful metric here**
-
-### Recall Interpretation
-
-| Range | Meaning |
-|---|---|
-| 95–100% | Excellent — nearly all query nodes recovered |
-| 80–95% | Good |
-| 50–80% | Moderate — some partitions missed |
-| <50% | Poor |
-
----
-
-## 8. Random Sampling Ground-Truth Metrics
-
-Random sampling: pick random anchor → k-hop expand to ~10K nodes → compute overlap with query. Best result across 10 retries is kept.
-
-| Column | Type | Description |
-|---|---|---|
-| `rs_node_precision` | float [0,1] | `\|sampled ∩ query\| / \|sampled\|` |
-| `rs_node_recall` | float [0,1] | `\|sampled ∩ query\| / \|query\|` |
-| `rs_node_f1` | float [0,1] | Harmonic mean |
-| `rs_gt_partition_recall` | float [0,1] | Fraction of true partitions covered by sample |
-| `rs_all_gt_found` | bool | All true partitions covered? |
-| `rs_contains_query` | bool | Are **all** query nodes in the sample? |
-
-> [!TIP]
-> Random sampling partition recall is high (~94%) because random 10K nodes span many partitions. But random sampling **node recall is only ~25%** — it covers partitions without finding the query nodes. Jigsaw achieves **90.9% node recall** (3.6× better).
-
----
-
-## 9. Timing
-
-| Column | Type | Description | Typical |
-|---|---|---|---|
-| `embed_time` | float (s) | GNN encoder inference | ~7ms |
-| `hashing_time` | float (s) | Discretizing graph features to C++ labels | ~0.5s |
-| `faiss_time` | float (s) | FAISS nearest-neighbor search | ~0.3ms |
-| `solver_time` | float (s) | Total C++ exact solver time | ~1.1s |
-| `total_time` | float (s) | End-to-end pipeline | ~1.63s |
-
----
-
-## 10. Quick Reference: Which Metric for What?
-
-| Question | Look at |
-|---|---|
-| Can the model find the right partition? | `coarse_correct` (Coarse@1) |
-| How many true partitions are retrieved? | `gt_partition_recall` |
-| Are the actual query nodes recovered? | `recall` (Node Recall) |
-| Are our extracted partitions better than random sampling? | `recall` vs `rs_node_recall` |
-| Is there an exact subgraph match? | `solver_found` |
-| How fast is the pipeline? | `total_time` |
-
-## 11. Special Values
-
-| Value | Where | Meaning |
-|---|---|---|
-| `NaN` | Various | Summary/overhead row (filter out `query_type == 'OVERALL'`) |
-| `OVERALL` | `query_type` | Aggregated summary row, not a real query |
-| `False` | `success` | Pipeline error — other metrics may be invalid |
+`max_live_positive_parts` controls how many true coarse partitions are
+re-encoded with gradients in each batch. The remaining partition bank is still
+cached. This hybrid keeps the full 200-partition comparison affordable while
+allowing coverage gradients to update both query and positive-partition
+representations.

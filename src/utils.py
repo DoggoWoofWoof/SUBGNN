@@ -35,13 +35,10 @@ def feature_to_label(vector: np.ndarray) -> int:
         vector_rounded = np.round(vector, 4)
         feats_tuple = tuple(vector_rounded.tolist())
         
-    h = hash(feats_tuple)
-    if h not in _feature_hash_to_contiguous:
-        _feature_hash_to_contiguous[h] = _next_contiguous_id
-        _next_contiguous_id += 1
-    
-    # Cap to 0..63 because SubgraphMatching C++ uses std::bitset<64>
-    return _feature_hash_to_contiguous[h] % 64
+    # Purely deterministic hash (MD5 mod 1 million)
+    feat_str = str(feats_tuple).encode('utf-8')
+    h = int(hashlib.md5(feat_str).hexdigest(), 16)
+    return h % 1000000
 
 
 

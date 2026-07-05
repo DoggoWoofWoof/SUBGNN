@@ -7,6 +7,7 @@ env/
 venv/
 .env
 .venv
+.venv_modal/
 build/
 develop-eggs/
 dist/
@@ -29,7 +30,24 @@ wheels/
 *.log
 .DS_Store
 .gemini/
+.agents/
+.modal.toml
 v1/
+results/
+runs/
+archive/
+SubgraphMatching_tmp/
+tmp/
+archive/legacy_model_artifacts/*.pth
+models/*.pth
+models/training_log_*.txt
+reviews.pdf
+modal_*.py
+patch_*.py
+patch_*.sh
+
+# Allow paper-ready assets and canonical benchmark releases
+!paper/*.png
 
 # Allow benchmark results
 !benchmarks/
@@ -39,9 +57,31 @@ v1/
 *_eval_summary.txt
 error.txt
 
+# Local paper build and visual-QA tools
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk
+runs/pdf_tools*/
+runs/paper_render*/
+runs/paper_visual*/
+
+# Root-level generated paper/review outputs belong in paper/ or archive/
+/samplepaper.aux
+/samplepaper.log
+/samplepaper.pdf
+/review_page_*.png
+
 # Temp scripts
 check_*.py
 verify_csv.py
+fix.py
+fix2.py
+patch_eval.py
+rewrite_tex.py
 
 # Data and cache
 cache/
