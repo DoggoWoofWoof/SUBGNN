@@ -1,13 +1,10 @@
 """
 Query Generator Module for Evaluation
 
-This module provides NetworkX-based query generation for accurate evaluation.
-Uses NetworkX for interpretable graph operations.
-
-NOTE: For training, use sampling.py instead (SparseTensor-optimized, faster).
-The two modules serve different purposes:
-- query_generator.py: Accurate evaluation with NetworkX (flexible, interpretable)  
-- sampling.py: Fast training with SparseTensor (GPU-optimized)
+This module provides NetworkX-based query generation for accurate evaluation,
+using NetworkX for interpretable, flexible graph operations. Training-time query
+sampling is done inline by the trainers (see scripts/train_final_loss_local.py);
+this module is the evaluation-time generator.
 """
 
 import itertools

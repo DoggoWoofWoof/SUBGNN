@@ -4,6 +4,8 @@ Jigsaw is a retrieval-constrained exact subgraph matching pipeline. A learned en
 
 This repository is currently organized for the conference submission. Raw cloud run folders, model checkpoints, and cache artifacts are kept locally for provenance but ignored by Git; the reviewer-facing benchmark bundle is under `benchmarks/paper_results/final_results/`.
 
+**New to the codebase?** See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a full component map — the four-stage pipeline, every `src/` module and `scripts/` group, how to run each workflow, artifact layout, and the monolith-decomposition plan.
+
 ## Final Results
 
 Canonical summary files:
@@ -26,7 +28,8 @@ benchmarks/paper_results/      Verified, reviewer-facing evidence backing the pa
     diagnostics/               curated diagnostic CSVs referenced by the paper.
 runs/diagnostics/              Generated diagnostic outputs + findings (candidate shrinkage, boundary overlap,
                                random_walk analysis, partition stats) and the source CSVs for several figures.
-src/                           Canonical model (model.py: GIN + relation-aware RGCN) and data/eval.
+src/                           Library: encoders (model.py: GIN + RGCN), data+partitioning (data.py),
+                               solvers (glasgow_solver, solver_registry), query gen. See docs/ARCHITECTURE.md.
 scripts/                       Pipeline + tooling (see scripts/README.md):
     *.py (top level)           core pipeline, trainers, diagnostics, canonical figure/summary scripts.
     launchers/                 one-off Modal/Lightning run recipes (incl. staged walk-aware retrain).
@@ -45,7 +48,7 @@ tests/                         pytest unit suite (pytest tests/).
 - `scripts/launchers/run_overlap_model_benchmark_jobs.ps1`: Cora/Arxiv benchmark launcher for the overlap-trained GraphSAGE checkpoints.
 - `scripts/launchers/run_lightning_mag_benchmark.sh`: Lightning runtime wrapper used by benchmark jobs.
 - `scripts/summarize_production_benchmarks.py`: canonical per-query to summary aggregation.
-- `scripts/generate_submission_figures.py`: canonical paper figure generation (from `benchmarks/paper_results/final_results/` + `runs/diagnostics/`).
+- `scripts/generate_paper_figures_v2.py`: canonical paper figure generation (from `benchmarks/paper_results/final_results/` + `runs/diagnostics/`). Note: `generate_submission_figures.py` is **superseded** (reads a stale run) — do not use it.
 
 ## Reproducing Summaries
 
