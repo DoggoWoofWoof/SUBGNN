@@ -1,0 +1,53 @@
+# Canonical paper-matching headline numbers. Source of truth = ../CANONICAL_SOURCES.md.
+# Production matrix (per dataset x method); budget K = half-partition (Cora 10 / Arxiv 100 / MAG 1000).
+dataset,budget_K,method,pos_exact_solve_rate_pct,avg_candidate_nodes_K,provenance
+Cora,10,Jigsaw,94.2,2.5,"deployed seed7203 walk-aware (MAG) / overlap-graphsage-v3 (Cora,Arxiv)"
+Cora,10,Mean-RRF,93.8,2.4,"RRF fusion of learned+mean, same encoders"
+Cora,10,MeanFeat,88.8,3.5,encoder-independent (mean_feature)
+Cora,10,TopoFeat,33.4,9.5,encoder-independent (topo_feature)
+Cora,10,Random,31.3,9.6,encoder-independent (random)
+Cora,10,FilterAll,100.0,0.8,"exhaustive ceiling, budget-independent (all partitions)"
+Arxiv,100,Jigsaw,92.8,0.2,"deployed seed7203 walk-aware (MAG) / overlap-graphsage-v3 (Cora,Arxiv)"
+Arxiv,100,Mean-RRF,94.0,0.2,"RRF fusion of learned+mean, same encoders"
+Arxiv,100,MeanFeat,88.9,0.2,encoder-independent (mean_feature)
+Arxiv,100,TopoFeat,33.2,0.3,encoder-independent (topo_feature)
+Arxiv,100,Random,37.7,0.3,encoder-independent (random)
+Arxiv,100,FilterAll,100.0,0.1,"exhaustive ceiling, budget-independent (all partitions)"
+MAG,1000,Jigsaw,88.6,138.1,"deployed seed7203 walk-aware (MAG) / overlap-graphsage-v3 (Cora,Arxiv)"
+MAG,1000,Mean-RRF,85.4,137.1,"RRF fusion of learned+mean, same encoders"
+MAG,1000,MeanFeat,64.6,212.1,encoder-independent (mean_feature)
+MAG,1000,TopoFeat,37.1,235.6,encoder-independent (topo_feature)
+MAG,1000,Random,51.4,282.1,encoder-independent (random)
+MAG,1000,FilterAll,98.4,443.8,"exhaustive ceiling, budget-independent (all partitions)"
+
+# MAG per-family positive solve rate (deployed seed7203)
+dataset,query_family,queries,solved,solved_pct,provenance
+MAG,single,300,296,98.7,deployed seed7203 six-family summary
+MAG,k_hop,300,280,93.3,deployed seed7203 six-family summary
+MAG,degree_k_hop,300,278,92.7,deployed seed7203 six-family summary
+MAG,multi_fine,300,300,100.0,deployed seed7203 six-family summary
+MAG,multi_coarse,300,228,76.0,deployed seed7203 six-family summary
+MAG,random_walk,300,213,71.0,deployed seed7203 six-family summary
+
+# FeatureIndex (classical GraphGrep/gIndex label-coverage index) — MAG production row, near-unique md5 labels
+dataset,budget_K,method,pos_exact_solve_rate_pct,avg_candidate_nodes_K,provenance
+MAG,1000,FeatureIndex,96.7,59.4,"near-unique md5 labels; runs/label_selectivity_experiments/featureindex-baseline__*"
+
+# Label-selectivity crossover ACROSS datasets (retrieval-rank; median worst-true-partition rank of |P|, lower=better; retrieval-only, n=540/dataset)
+# source: scripts/probe_fi_selectivity.py -> runs/fi_selectivity/{cora_fi_neural,arxiv_fi}.csv
+dataset,partitions,fi_feature_rank,fi_class_rank,neural_rank,med_parts_per_label_feature,med_parts_per_label_class
+Cora,20,2,7,5,1,12
+Arxiv,200,4,104,44,1,124.5
+# per-query sign test p<1e-30 both regimes; feature FI-wins (Cora 352/6, Arxiv 388/1), class neural-wins (Cora 358/111, Arxiv 452/76); ties concentrate on contained families. Cora/Arxiv = ranking (no solver run); MAG carries solve corroboration.
+
+# Inference-time retrieval remedies on spatially-extended MAG queries (FullCov@1000 %, same 1800 queries; genuine-fix gate = +20)
+# source: scripts/probe_finegrain_expansion.py -> runs/probe_finegrain/probe_finegrain_per_query.csv; scripts/probe_multivector_ranking.py -> runs/multivector_probe/
+method,k_hop_fullcov1000,degree_k_hop_fullcov1000,random_walk_fullcov1000
+single_vector,14.7,17.3,9.0
+subquery_maxsim,14.3,17.7,8.0
+fine_parent,12.7,16.7,8.3
+fine_overlap_1hop,13.3,17.3,10.0
+fine_overlap_2hop,13.3,18.3,9.3
+dual_granularity_late_interaction,12.7,16.0,8.7
+coarse_diffusion,17.0,19.7,10.3
+# best gain +2.3 (coarse diffusion) vs +20 gate; coarse neighbor-stitch actively harmful (-8 to -13). Mechanism (density): coarse partition degree median 948/2000, fine partition mean 568/10000.

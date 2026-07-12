@@ -61,6 +61,14 @@ python scripts\summarize_production_benchmarks.py @files --output runs\lightning
 
 The final published summaries are copied into `benchmarks/paper_results/final_results/` with SHA-256 hashes recorded in `manifest.json`.
 
+For a paper-facing smoke check of the headline numbers and the newest selector/foreclosure claims, run:
+
+```powershell
+python scripts\analysis\reproduce_paper_numbers.py
+```
+
+The checker verifies the MAG deployed-encoder matrix, Cora/Arxiv label-selectivity selector, and MAG retrieval-remedy foreclosure from local CSVs. It treats non-core GNN-PE diagnostic provenance as optional unless `--strict-optional` is passed.
+
 Budget reporting uses explicit columns: `first_solved_at_<B>` is the exact first-hit bucket, while `solved_by_<B>` is cumulative and should be used for budget-curve analysis.
 
 ## Exactness Scope

@@ -1,0 +1,81 @@
+{
+  "name": "paper_icann2026_final",
+  "generated_at_utc": "2026-06-20T18:41:14.182128+00:00",
+  "status": "conference submission bundle",
+  "primary_results": {
+    "directory": "final_results",
+    "manifest": "final_results/manifest.json",
+    "all_datasets_summary": "final_results/final_all_datasets_summary.csv",
+    "dataset_summaries": [
+      "final_results/final_mag_summary.csv",
+      "final_results/final_arxiv_summary.csv",
+      "final_results/final_cora_summary.csv"
+    ],
+    "diagnostic_model_ablation_summary": "final_results/final_diagnostic_model_ablation_summary.csv",
+    "completion_audit": "final_results/final_benchmark_completion_audit.csv",
+    "csv_cleaning_report": "final_results/csv_cleaning_report.json",
+    "csv_validation_report": "final_results/csv_validation_report.json",
+    "production_grid_coverage": "final_results/production_grid_coverage.csv",
+    "benchmark_grid_coverage_report": "final_results/benchmark_grid_coverage_report.json"
+  },
+  "coverage": {
+    "production_datasets": [
+      "mag",
+      "arxiv",
+      "cora"
+    ],
+    "production_methods": [
+      "neural_component",
+      "random_component",
+      "mean_feature_component",
+      "mean_rrf_component",
+      "topo_feature_component",
+      "filterall_component"
+    ],
+    "query_types": [
+      "k_hop",
+      "degree_k_hop",
+      "random_walk",
+      "single",
+      "multi_coarse",
+      "multi_fine",
+      "negative_label",
+      "negative_structure"
+    ],
+    "query_sizes": [
+      20,
+      50,
+      100
+    ],
+    "seeds": [
+      20260607,
+      20260608
+    ],
+    "expected_rows_per_dataset": 288,
+    "expected_total_rows": 864,
+    "status_counts": {
+      "OK": 864
+    },
+    "notes": [
+      "The main benchmark claim is the selected overlap-cascade/component production matrix across MAG, Arxiv, and Cora.",
+      "Each dataset summary has exactly 288 rows: 6 methods x 2 seeds x 8 query types x 3 target sizes.",
+      "final_all_datasets_summary.csv is exactly the union of the three dataset summaries and has 864 rows.",
+      "Diagnostic ablations and model variants are preserved separately and are not counted in the production grid.",
+      "Canonical production summaries contain no _partial_per_query rows."
+    ]
+  },
+  "ablation_evidence": {
+    "directory": "ablations",
+    "manifest": "ablations/manifest.json",
+    "diagnostic_summary": "final_results/final_diagnostic_model_ablation_summary.csv",
+    "notes": [
+      "Arxiv design ablations, v7 continuation rows, and MAG final-checkpoint variants are retained as method evidence.",
+      "Locked objective/loss ablations and v7 continuation summaries are copied from validated local run logs.",
+      "Large raw per-query ablation CSVs remain under runs/ and are intentionally excluded from the submission bundle."
+    ]
+  },
+  "legacy_diagnostics": {
+    "directory": "diagnostics",
+    "notes": "Older locked diagnostics retained for paper context and sanity checks, not the canonical final result source."
+  }
+}

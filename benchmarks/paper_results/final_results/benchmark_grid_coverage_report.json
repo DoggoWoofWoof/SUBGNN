@@ -1,0 +1,20 @@
+{
+  "generated_at_utc": "2026-06-20T18:41:13.361001+00:00",
+  "expected_rows_per_dataset": 288,
+  "expected_total_rows": 864,
+  "status_counts": {
+    "OK": 864
+  },
+  "dataset_status_counts": {
+    "arxiv": {
+      "OK": 288
+    },
+    "cora": {
+      "OK": 288
+    },
+    "mag": {
+      "OK": 288
+    }
+  },
+  "issues": []
+}

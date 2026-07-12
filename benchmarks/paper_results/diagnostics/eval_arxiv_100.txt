@@ -1,0 +1,296 @@
+✓ Initialized. View run at 
+https://modal.com/apps/darkphoenix696969696969/main/ap-3RivY20mautEq5FAk8qcvz
+✓ Created objects.
+├── 🔨 Created mount C:\Users\Swastik\Desktop\Jigsaw\modal_all_query_eval.py
+├── 🔨 Created mount C:\Users\Swastik\Desktop\Jigsaw\src
+└── 🔨 Created function evaluate_all_query_types.
+======================================================================
+JIGSAW ALL-QUERY-TYPE EVALUATION
+======================================================================
+
+Device: cuda
+
+Model files in /cache: ['arxiv_final_fixed_model.pth', 'jigsaw_checkpoint.pth', 'mag_hierarchy_rebuild_darkphoenix_checkpoint.pth']
+Using model: /cache/models/arxiv-6_layer-model-jigsaw_coverage_final_ablation_final_seed7101_best_fullcov.pth
+
+[1/6] Loading arxiv...
+Downloading http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip
+
+[1A  0%|          | 0/81 [00:00<?, ?it/s]
+[1ADownloaded 0.00 GB:   0%|          | 0/81 [00:00<?, ?it/s]
+[1ADownloaded 0.00 GB:   1%|          | 1/81 [00:00<01:14,  1.08it/s]
+[1ADownloaded 0.00 GB:   1%|          | 1/81 [00:01<01:14,  1.08it/s]
+[1ADownloaded 0.00 GB:   2%|▏         | 2/81 [00:01<00:39,  2.00it/s]
+[1ADownloaded 0.00 GB:   2%|▏         | 2/81 [00:01<00:39,  2.00it/s]
+[1ADownloaded 0.00 GB:   4%|▎         | 3/81 [00:01<00:25,  3.01it/s]
+[1ADownloaded 0.00 GB:   4%|▎         | 3/81 [00:01<00:25,  3.01it/s]
+[1ADownloaded 0.00 GB:   5%|▍         | 4/81 [00:01<00:19,  4.00it/s]
+[1ADownloaded 0.00 GB:   5%|▍         | 4/81 [00:01<00:19,  4.00it/s]
+[1ADownloaded 0.01 GB:   5%|▍         | 4/81 [00:01<00:19,  4.00it/s]
+[1ADownloaded 0.01 GB:   7%|▋         | 6/81 [00:01<00:11,  6.52it/s]
+[1ADownloaded 0.01 GB:   7%|▋         | 6/81 [00:01<00:11,  6.52it/s]
+[1ADownloaded 0.01 GB:   7%|▋         | 6/81 [00:01<00:11,  6.52it/s]
+[1ADownloaded 0.01 GB:  10%|▉         | 8/81 [00:01<00:08,  8.77it/s]
+[1ADownloaded 0.01 GB:  10%|▉         | 8/81 [00:01<00:08,  8.77it/s]
+[1ADownloaded 0.01 GB:  10%|▉         | 8/81 [00:01<00:08,  8.77it/s]
+[1ADownloaded 0.01 GB:  10%|▉         | 8/81 [00:01<00:08,  8.77it/s]
+[1ADownloaded 0.01 GB:  14%|█▎        | 11/81 [00:01<00:05, 12.69it/s]
+[1ADownloaded 0.01 GB:  14%|█▎        | 11/81 [00:01<00:05, 12.69it/s]
+[1ADownloaded 0.01 GB:  14%|█▎        | 11/81 [00:01<00:05, 12.69it/s]
+[1ADownloaded 0.01 GB:  14%|█▎        | 11/81 [00:01<00:05, 12.69it/s]
+[1ADownloaded 0.01 GB:  14%|█▎        | 11/81 [00:01<00:05, 12.69it/s]
+[1ADownloaded 0.01 GB:  19%|█▊        | 15/81 [00:01<00:03, 16.87it/s]
+[1ADownloaded 0.02 GB:  19%|█▊        | 15/81 [00:01<00:03, 16.87it/s]
+[1ADownloaded 0.02 GB:  19%|█▊        | 15/81 [00:01<00:03, 16.87it/s]
+[1ADownloaded 0.02 GB:  19%|█▊        | 15/81 [00:02<00:03, 16.87it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:02<00:03, 18.39it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:02<00:03, 18.39it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:02<00:03, 18.39it/s]
+[1ADownloaded 0.02 GB:  22%|██▏       | 18/81 [00:02<00:03, 18.39it/s]
+[1ADownloaded 0.02 GB:  26%|██▌       | 21/81 [00:02<00:03, 19.37it/s]
+[1ADownloaded 0.02 GB:  26%|██▌       | 21/81 [00:02<00:03, 19.37it/s]
+[1ADownloaded 0.02 GB:  26%|██▌       | 21/81 [00:02<00:03, 19.37it/s]
+[1ADownloaded 0.02 GB:  26%|██▌       | 21/81 [00:02<00:03, 19.37it/s]
+[1ADownloaded 0.02 GB:  30%|██▉       | 24/81 [00:02<00:03, 18.19it/s]
+[1ADownloaded 0.02 GB:  30%|██▉       | 24/81 [00:02<00:03, 18.19it/s]
+[1ADownloaded 0.03 GB:  30%|██▉       | 24/81 [00:02<00:03, 18.19it/s]
+[1ADownloaded 0.03 GB:  30%|██▉       | 24/81 [00:02<00:03, 18.19it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:02<00:03, 16.78it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:02<00:03, 16.78it/s]
+[1ADownloaded 0.03 GB:  33%|███▎      | 27/81 [00:02<00:03, 16.78it/s]
+[1ADownloaded 0.03 GB:  36%|███▌      | 29/81 [00:02<00:03, 16.36it/s]
+[1ADownloaded 0.03 GB:  36%|███▌      | 29/81 [00:02<00:03, 16.36it/s]
+[1ADownloaded 0.03 GB:  36%|███▌      | 29/81 [00:02<00:03, 16.36it/s]
+[1ADownloaded 0.03 GB:  38%|███▊      | 31/81 [00:02<00:03, 15.88it/s]
+[1ADownloaded 0.03 GB:  38%|███▊      | 31/81 [00:02<00:03, 15.88it/s]
+[1ADownloaded 0.03 GB:  38%|███▊      | 31/81 [00:02<00:03, 15.88it/s]
+[1ADownloaded 0.03 GB:  41%|████      | 33/81 [00:02<00:03, 15.56it/s]
+[1ADownloaded 0.03 GB:  41%|████      | 33/81 [00:03<00:03, 15.56it/s]
+[1ADownloaded 0.03 GB:  41%|████      | 33/81 [00:03<00:03, 15.56it/s]
+[1ADownloaded 0.03 GB:  43%|████▎     | 35/81 [00:03<00:03, 15.03it/s]
+[1ADownloaded 0.04 GB:  43%|████▎     | 35/81 [00:03<00:03, 15.03it/s]
+[1ADownloaded 0.04 GB:  43%|████▎     | 35/81 [00:03<00:03, 15.03it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:03<00:03, 13.76it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:03<00:03, 13.76it/s]
+[1ADownloaded 0.04 GB:  46%|████▌     | 37/81 [00:03<00:03, 13.76it/s]
+[1ADownloaded 0.04 GB:  48%|████▊     | 39/81 [00:03<00:02, 14.01it/s]
+[1ADownloaded 0.04 GB:  48%|████▊     | 39/81 [00:03<00:02, 14.01it/s]
+[1ADownloaded 0.04 GB:  48%|████▊     | 39/81 [00:03<00:02, 14.01it/s]
+[1ADownloaded 0.04 GB:  51%|█████     | 41/81 [00:03<00:02, 14.32it/s]
+[1ADownloaded 0.04 GB:  51%|█████     | 41/81 [00:03<00:02, 14.32it/s]
+[1ADownloaded 0.04 GB:  51%|█████     | 41/81 [00:03<00:02, 14.32it/s]
+[1ADownloaded 0.04 GB:  53%|█████▎    | 43/81 [00:03<00:02, 14.53it/s]
+[1ADownloaded 0.04 GB:  53%|█████▎    | 43/81 [00:03<00:02, 14.53it/s]
+[1ADownloaded 0.04 GB:  53%|█████▎    | 43/81 [00:03<00:02, 14.53it/s]
+[1ADownloaded 0.04 GB:  56%|█████▌    | 45/81 [00:03<00:02, 14.67it/s]
+[1ADownloaded 0.04 GB:  56%|█████▌    | 45/81 [00:03<00:02, 14.67it/s]
+[1ADownloaded 0.05 GB:  56%|█████▌    | 45/81 [00:03<00:02, 14.67it/s]
+[1ADownloaded 0.05 GB:  58%|█████▊    | 47/81 [00:03<00:02, 14.79it/s]
+[1ADownloaded 0.05 GB:  58%|█████▊    | 47/81 [00:04<00:02, 14.79it/s]
+[1ADownloaded 0.05 GB:  58%|█████▊    | 47/81 [00:04<00:02, 14.79it/s]
+[1ADownloaded 0.05 GB:  60%|██████    | 49/81 [00:04<00:02, 14.87it/s]
+[1ADownloaded 0.05 GB:  60%|██████    | 49/81 [00:04<00:02, 14.87it/s]
+[1ADownloaded 0.05 GB:  60%|██████    | 49/81 [00:04<00:02, 14.87it/s]
+[1ADownloaded 0.05 GB:  63%|██████▎   | 51/81 [00:04<00:02, 14.94it/s]
+[1ADownloaded 0.05 GB:  63%|██████▎   | 51/81 [00:04<00:02, 14.94it/s]
+[1ADownloaded 0.05 GB:  63%|██████▎   | 51/81 [00:04<00:02, 14.94it/s]
+[1ADownloaded 0.05 GB:  65%|██████▌   | 53/81 [00:04<00:01, 15.01it/s]
+[1ADownloaded 0.05 GB:  65%|██████▌   | 53/81 [00:04<00:01, 15.01it/s]
+[1ADownloaded 0.05 GB:  65%|██████▌   | 53/81 [00:04<00:01, 15.01it/s]
+[1ADownloaded 0.05 GB:  68%|██████▊   | 55/81 [00:04<00:01, 15.05it/s]
+[1ADownloaded 0.05 GB:  68%|██████▊   | 55/81 [00:04<00:01, 15.05it/s]
+[1ADownloaded 0.06 GB:  68%|██████▊   | 55/81 [00:04<00:01, 15.05it/s]
+[1ADownloaded 0.06 GB:  70%|███████   | 57/81 [00:04<00:01, 15.09it/s]
+[1ADownloaded 0.06 GB:  70%|███████   | 57/81 [00:04<00:01, 15.09it/s]
+[1ADownloaded 0.06 GB:  70%|███████   | 57/81 [00:04<00:01, 15.09it/s]
+[1ADownloaded 0.06 GB:  73%|███████▎  | 59/81 [00:04<00:01, 15.10it/s]
+[1ADownloaded 0.06 GB:  73%|███████▎  | 59/81 [00:04<00:01, 15.10it/s]
+[1ADownloaded 0.06 GB:  73%|███████▎  | 59/81 [00:04<00:01, 15.10it/s]
+[1ADownloaded 0.06 GB:  75%|███████▌  | 61/81 [00:04<00:01, 15.06it/s]
+[1ADownloaded 0.06 GB:  75%|███████▌  | 61/81 [00:04<00:01, 15.06it/s]
+[1ADownloaded 0.06 GB:  75%|███████▌  | 61/81 [00:05<00:01, 15.06it/s]
+[1ADownloaded 0.06 GB:  78%|███████▊  | 63/81 [00:05<00:01, 15.16it/s]
+[1ADownloaded 0.06 GB:  78%|███████▊  | 63/81 [00:05<00:01, 15.16it/s]
+[1ADownloaded 0.06 GB:  78%|███████▊  | 63/81 [00:05<00:01, 15.16it/s]
+[1ADownloaded 0.06 GB:  80%|████████  | 65/81 [00:05<00:01, 15.11it/s]
+[1ADownloaded 0.06 GB:  80%|████████  | 65/81 [00:05<00:01, 15.11it/s]
+[1ADownloaded 0.07 GB:  80%|████████  | 65/81 [00:05<00:01, 15.11it/s]
+[1ADownloaded 0.07 GB:  83%|████████▎ | 67/81 [00:05<00:00, 15.18it/s]
+[1ADownloaded 0.07 GB:  83%|████████▎ | 67/81 [00:05<00:00, 15.18it/s]
+[1ADownloaded 0.07 GB:  83%|████████▎ | 67/81 [00:05<00:00, 15.18it/s]
+[1ADownloaded 0.07 GB:  85%|████████▌ | 69/81 [00:05<00:00, 15.26it/s]
+[1ADownloaded 0.07 GB:  85%|████████▌ | 69/81 [00:05<00:00, 15.26it/s]
+[1ADownloaded 0.07 GB:  85%|████████▌ | 69/81 [00:05<00:00, 15.26it/s]
+[1ADownloaded 0.07 GB:  88%|████████▊ | 71/81 [00:05<00:00, 15.28it/s]
+[1ADownloaded 0.07 GB:  88%|████████▊ | 71/81 [00:05<00:00, 15.28it/s]
+[1ADownloaded 0.07 GB:  88%|████████▊ | 71/81 [00:05<00:00, 15.28it/s]
+[1ADownloaded 0.07 GB:  90%|█████████ | 73/81 [00:05<00:00, 15.30it/s]
+[1ADownloaded 0.07 GB:  90%|█████████ | 73/81 [00:05<00:00, 15.30it/s]
+[1ADownloaded 0.07 GB:  90%|█████████ | 73/81 [00:05<00:00, 15.30it/s]
+[1ADownloaded 0.07 GB:  93%|█████████▎| 75/81 [00:05<00:00, 15.39it/s]
+[1ADownloaded 0.07 GB:  93%|█████████▎| 75/81 [00:05<00:00, 15.39it/s]
+[1ADownloaded 0.08 GB:  93%|█████████▎| 75/81 [00:05<00:00, 15.39it/s]
+[1ADownloaded 0.08 GB:  95%|█████████▌| 77/81 [00:05<00:00, 15.53it/s]
+[1ADownloaded 0.08 GB:  95%|█████████▌| 77/81 [00:06<00:00, 15.53it/s]
+[1ADownloaded 0.08 GB:  95%|█████████▌| 77/81 [00:06<00:00, 15.53it/s]
+[1ADownloaded 0.08 GB:  98%|█████████▊| 79/81 [00:06<00:00, 15.85it/s]
+[1ADownloaded 0.08 GB:  98%|█████████▊| 79/81 [00:06<00:00, 15.85it/s]
+[1ADownloaded 0.08 GB:  98%|█████████▊| 79/81 [00:06<00:00, 15.85it/s]
+[1ADownloaded 0.08 GB: 100%|██████████| 81/81 [00:06<00:00, 13.32it/s]
+Extracting /tmp/ogbn_arxiv/arxiv.zip
+Processing...
+Loading necessary files...
+This might take a while.
+Processing graphs...
+
+Converting graphs into PyG objects...
+[1A  0%|          | 0/1 [00:00<?, ?it/s]
+[1A100%|██████████| 1/1 [00:00<00:00, 21845.33it/s]
+
+[1A  0%|          | 0/1 [00:00<?, ?it/s]
+[1A100%|██████████| 1/1 [00:00<00:00, 5165.40it/s]
+/usr/local/lib/python3.11/site-packages/ogb/nodeproppred/dataset_pyg.py:187: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at ../torch/csrc/utils/tensor_numpy.cpp:206.)
+  data.y = torch.from_numpy(node_label).to(torch.long)
+Saving...
+Done!
+   169,343 nodes, 2,315,598 edges, 128 features (11.6s)
+
+[2/6] Loading hierarchy...
+   200 coarse, 1000 fine partitions (3.5s)
+
+[3/6] Loading model from /cache/models/arxiv-6_layer-model-jigsaw_coverage_final_ablation_final_seed7101_best_fullcov.pth...
+   Model loaded (0.5s)
+
+[4/6] Building FAISS index over coarse partitions...
+
+[1A   Embedding partitions:   0%|                          | 0/200 [00:00<?, ?it/s]
+[1A   Embedding partitions:   0%|                  | 1/200 [00:00<00:50,  3.93it/s]
+[1A   Embedding partitions:   8%|█▎               | 15/200 [00:00<00:03, 52.16it/s]
+[1A   Embedding partitions:  13%|██▏              | 26/200 [00:00<00:02, 71.13it/s]
+[1A   Embedding partitions:  20%|███▎             | 39/200 [00:00<00:01, 89.90it/s]
+[1A   Embedding partitions:  26%|████▍            | 52/200 [00:00<00:01, 99.02it/s]
+[1A   Embedding partitions:  32%|█████▏          | 65/200 [00:00<00:01, 108.25it/s]
+[1A   Embedding partitions:  38%|██████▏         | 77/200 [00:00<00:01, 109.55it/s]
+[1A   Embedding partitions:  44%|███████         | 89/200 [00:00<00:00, 112.07it/s]
+[1A   Embedding partitions:  50%|███████▌       | 101/200 [00:01<00:00, 111.84it/s]
+[1A   Embedding partitions:  57%|████████▌      | 114/200 [00:01<00:00, 116.84it/s]
+[1A   Embedding partitions:  63%|█████████▍     | 126/200 [00:01<00:00, 113.59it/s]
+[1A   Embedding partitions:  71%|██████████▋    | 142/200 [00:01<00:00, 126.19it/s]
+[1A   Embedding partitions:  79%|███████████▊   | 158/200 [00:01<00:00, 134.21it/s]
+[1A   Embedding partitions:  86%|████████████▉  | 172/200 [00:01<00:00, 130.10it/s]
+[1A   Embedding partitions:  93%|█████████████▉ | 186/200 [00:01<00:00, 131.91it/s]
+[1A   Embedding partitions: 100%|███████████████| 200/200 [00:01<00:00, 125.76it/s]
+[1A   Embedding partitions: 100%|███████████████| 200/200 [00:01<00:00, 108.04it/s]
+   FAISS index: 200 vectors (1.9s)
+
+[5/6] Generating 100 queries per type (target_size=100)...
+   single         : 100/100 queries generated (100 attempts, 0.2s)
+                   avg true coarse parts: 1.0 (min=1, max=1)
+   multi_fine     : 100/100 queries generated (100 attempts, 0.5s)
+                   avg true coarse parts: 1.0 (min=1, max=1)
+   multi_coarse   : 100/100 queries generated (100 attempts, 4.0s)
+                   avg true coarse parts: 3.6 (min=2, max=5)
+   k_hop          : 100/100 queries generated (100 attempts, 2.4s)
+                   avg true coarse parts: 20.4 (min=3, max=53)
+
+[6/6] Evaluating FAISS retrieval FullCov@[20, 50, 100]...
+
+
+
+Final returned results:
+{
+  "model": "arxiv-6_layer-model-jigsaw_coverage_final_ablation_final_seed7101_best_fullcov.pth",
+  "results": {
+    "single": {
+      "20": {
+        "fullcov": 99,
+        "total": 100,
+        "recall": 0.99
+      },
+      "50": {
+        "fullcov": 100,
+        "total": 100,
+        "recall": 1.0
+      },
+      "100": {
+        "fullcov": 100,
+        "total": 100,
+        "recall": 1.0
+      }
+    },
+    "multi_fine": {
+      "20": {
+        "fullcov": 100,
+        "total": 100,
+        "recall": 1.0
+      },
+      "50": {
+        "fullcov": 100,
+        "total": 100,
+        "recall": 1.0
+      },
+      "100": {
+        "fullcov": 100,
+        "total": 100,
+        "recall": 1.0
+      }
+    },
+    "multi_coarse": {
+      "20": {
+        "fullcov": 25,
+        "total": 100,
+        "recall": 0.6644999999999999
+      },
+      "50": {
+        "fullcov": 49,
+        "total": 100,
+        "recall": 0.8413333333333333
+      },
+      "100": {
+        "fullcov": 79,
+        "total": 100,
+        "recall": 0.9456666666666664
+      }
+    },
+    "k_hop": {
+      "20": {
+        "fullcov": 5,
+        "total": 100,
+        "recall": 0.556205996510977
+      },
+      "50": {
+        "fullcov": 15,
+        "total": 100,
+        "recall": 0.7985038549635333
+      },
+      "100": {
+        "fullcov": 51,
+        "total": 100,
+        "recall": 0.9502037759135231
+      }
+    }
+  }
+}
+================================================================================
+JIGSAW ALL-QUERY-TYPE EVALUATION RESULTS
+Dataset: OGBN-Arxiv | Model: arxiv-6_layer-model-jigsaw_coverage_final_ablation_final_seed7101_best_fullcov.pth
+Queries per type: 100 | Target size: 100 | Seed: 42
+================================================================================
+Query Type      | FullCov@ 20       | Recall@ 20 | FullCov@ 50       | Recall@ 50 | FullCov@100       | Recall@100
+------------------------------------------------------------------------------------------------------------------
+single          |  99/100 ( 99.0%) | 0.9900 | 100/100 (100.0%) | 1.0000 | 100/100 (100.0%) | 1.0000
+multi_fine      | 100/100 (100.0%) | 1.0000 | 100/100 (100.0%) | 1.0000 | 100/100 (100.0%) | 1.0000
+multi_coarse    |  25/100 ( 25.0%) | 0.6645 |  49/100 ( 49.0%) | 0.8413 |  79/100 ( 79.0%) | 0.9457
+k_hop           |   5/100 (  5.0%) | 0.5562 |  15/100 ( 15.0%) | 0.7985 |  51/100 ( 51.0%) | 0.9502
+================================================================================
+
+Query type statistics:
+  single         : 100 queries, avg_true_coarse=1.0, min=1, max=1
+  multi_fine     : 100 queries, avg_true_coarse=1.0, min=1, max=1
+  multi_coarse   : 100 queries, avg_true_coarse=3.6, min=2, max=5
+  k_hop          : 100 queries, avg_true_coarse=20.4, min=3, max=53
+
+✅ Evaluation complete!
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/darkphoenix696969696969/main/ap-3RivY20mautEq5FAk8qcvz

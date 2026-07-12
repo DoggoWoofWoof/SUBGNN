@@ -1,0 +1,93 @@
+{
+  "generated_at_utc": "2026-07-12T18:32:28+00:00",
+  "note": "Canonical production-only CSV bundle. HEADLINE_NUMBERS.csv holds the paper-matching headline (deployed encoders); the per-config final_*_summary.csv neural/Mean-RRF rows are a superseded run (see README). Manifest refreshed to match current post-connected-merge files.",
+  "validation": {
+    "generated_at_utc": "2026-06-20T18:41:13.546567+00:00",
+    "status": "pass",
+    "issues": [],
+    "production_rows": {
+      "cora": 288,
+      "arxiv": 288,
+      "mag": 288
+    },
+    "all_datasets_rows": 864,
+    "diagnostic_rows_preserved": 222
+  },
+  "coverage_status_counts": {
+    "OK": 864
+  },
+  "files": {
+    "HEADLINE_NUMBERS.csv": {
+      "bytes": 3903,
+      "sha256": "4c549c77b67dfc31ebd4b610791c79a432e583fd37822635710e54b02fc660a0",
+      "rows": 34,
+      "columns": 7
+    },
+    "README.md": {
+      "bytes": 4023,
+      "sha256": "713ee0d116ccc82b13e48ed5ad849bb476972b8559ed610f29c01a579b3de6a9",
+      "rows": null,
+      "columns": null
+    },
+    "benchmark_grid_coverage_report.json": {
+      "bytes": 345,
+      "sha256": "08cca70d02c2ab2c0c63d7c89faec6f9e7849f6ea315d1dcb9f38b58d6871112",
+      "rows": null,
+      "columns": null
+    },
+    "csv_cleaning_report.json": {
+      "bytes": 1738,
+      "sha256": "700d24539bc88641653be4e9b4845da7e530763944037104db7b2e06690dd424",
+      "rows": null,
+      "columns": null
+    },
+    "csv_validation_report.json": {
+      "bytes": 249,
+      "sha256": "83466ef2b7cc0be2a1a572e044ba9db98577fe96b8f76113ac1ec28465680f82",
+      "rows": null,
+      "columns": null
+    },
+    "final_all_datasets_summary.csv": {
+      "bytes": 715564,
+      "sha256": "80947750ff55f1e70df40d56ad2171a46c8c7cc5684520730b91097e6fc3284a",
+      "rows": 864,
+      "columns": 186
+    },
+    "final_arxiv_summary.csv": {
+      "bytes": 237559,
+      "sha256": "a68ea39c575aba72edc66cfa6325844c715314f2f25fbf18eabb67991aa3dc18",
+      "rows": 288,
+      "columns": 186
+    },
+    "final_benchmark_completion_audit.csv": {
+      "bytes": 8932,
+      "sha256": "4a5214851734af328599de01f0d1bce0a290beef8289bbe8d126b389b66a2c51",
+      "rows": 23,
+      "columns": 60
+    },
+    "final_cora_summary.csv": {
+      "bytes": 241309,
+      "sha256": "81ddf6026eb5f1f96b87093007b7105de6a4c46a82f213a21a1d6d273883a5fb",
+      "rows": 288,
+      "columns": 186
+    },
+    "final_diagnostic_model_ablation_summary.csv": {
+      "bytes": 175977,
+      "sha256": "df96a99e88adb0730865137765b61d2d4c0eea684b643921798e15f1996a2146",
+      "rows": 222,
+      "columns": 186
+    },
+    "final_mag_summary.csv": {
+      "bytes": 244452,
+      "sha256": "8366faf38ac35416a0346dff6f451018f28d5c6ac8193a4038f6d273d6d6b5e9",
+      "rows": 288,
+      "columns": 186
+    },
+    "production_grid_coverage.csv": {
+      "bytes": 61400,
+      "sha256": "9a0aee30f71ad932ee2bc448c60c395f1d6e6e7eaa6e94f96766a022438c237b",
+      "rows": 864,
+      "columns": 10
+    }
+  }
+}

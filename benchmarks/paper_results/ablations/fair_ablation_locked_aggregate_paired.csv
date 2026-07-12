@@ -1,0 +1,7 @@
+method,budget,wins,losses,exact_mcnemar_p
+coarse_hybrid_mw0.5_teleport10,50,40,24,0.05994118956699923
+coarse_hybrid_mw0.5_teleport10,75,52,36,0.10929542977731425
+coarse_hybrid_mw0.5_teleport10,100,32,26,0.5118423084381689
+fixed,20,25,8,0.004551384132355452
+fixed,50,58,19,9.77507078797376e-06
+fixed,100,86,22,3.98824386580155e-10

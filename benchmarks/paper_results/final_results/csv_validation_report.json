@@ -1,0 +1,12 @@
+{
+  "generated_at_utc": "2026-06-20T18:41:13.546567+00:00",
+  "status": "pass",
+  "issues": [],
+  "production_rows": {
+    "cora": 288,
+    "arxiv": 288,
+    "mag": 288
+  },
+  "all_datasets_rows": 864,
+  "diagnostic_rows_preserved": 222
+}

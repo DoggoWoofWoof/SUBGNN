@@ -1,0 +1,47 @@
+[
+  {
+    "file": "benchmarks/paper_icann2026/final_results/final_mag_summary.csv",
+    "backup": "archive/non_submission_20260620/csv_preclean/final_mag_summary.csv",
+    "before_rows": 553,
+    "blank_file_rows_removed": 0,
+    "duplicate_rows_removed": 169,
+    "partial_duplicate_rows_removed": 168,
+    "after_rows": 384
+  },
+  {
+    "file": "benchmarks/paper_icann2026/final_results/final_arxiv_summary.csv",
+    "backup": "archive/non_submission_20260620/csv_preclean/final_arxiv_summary.csv",
+    "before_rows": 1170,
+    "blank_file_rows_removed": 276,
+    "duplicate_rows_removed": 492,
+    "partial_duplicate_rows_removed": 0,
+    "after_rows": 402
+  },
+  {
+    "file": "benchmarks/paper_icann2026/final_results/final_cora_summary.csv",
+    "backup": "archive/non_submission_20260620/csv_preclean/final_cora_summary.csv",
+    "before_rows": 288,
+    "blank_file_rows_removed": 0,
+    "duplicate_rows_removed": 0,
+    "partial_duplicate_rows_removed": 0,
+    "after_rows": 288
+  },
+  {
+    "file": "benchmarks/paper_icann2026/final_results/final_all_datasets_summary.csv",
+    "backup": "archive/non_submission_20260620/csv_preclean/final_all_datasets_summary.csv",
+    "before_rows": 2011,
+    "blank_file_rows_removed": 276,
+    "duplicate_rows_removed": 661,
+    "partial_duplicate_rows_removed": 168,
+    "after_rows": 1074
+  },
+  {
+    "file": "benchmarks/paper_icann2026/ablations/arxiv_design_ablation_summary.csv",
+    "backup": "archive/non_submission_20260620/csv_preclean/arxiv_design_ablation_summary.csv",
+    "before_rows": 666,
+    "blank_file_rows_removed": 180,
+    "duplicate_rows_removed": 324,
+    "partial_duplicate_rows_removed": 0,
+    "after_rows": 162
+  }
+]

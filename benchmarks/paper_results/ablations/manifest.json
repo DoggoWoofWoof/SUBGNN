@@ -1,0 +1,46 @@
+{
+  "generated_at_utc": "2026-06-19T21:57:35Z",
+  "note": "Canonical cleaned CSV bundle. Blank source rows, partial duplicate rows, and duplicate canonical summary rows removed; dataset and seed columns normalized explicitly.",
+  "files": {
+    "arxiv_design_ablation_summary.csv": {
+      "rows": 162,
+      "columns": 166,
+      "sha256": "6d1651d40e22298da76af5be8e7ce8de791dc25831ba110735dcb634032d66de"
+    },
+    "fair_ablation_locked_aggregate_feasibility.csv": {
+      "rows": 6,
+      "columns": 6,
+      "sha256": "854011396f83c60bd5895b1bbbab9f467ac02e9a8779d597462941570c35e58f"
+    },
+    "fair_ablation_locked_aggregate_paired.csv": {
+      "rows": 6,
+      "columns": 5,
+      "sha256": "4e0e3e899ef3d19972a889aba07d308195a0f5f55ba1e9927cea8156c8fed426"
+    },
+    "fair_ablation_locked_aggregate.csv": {
+      "rows": 72,
+      "columns": 10,
+      "sha256": "7be1f4aa7080c1f545666dfbbd21ec28ad13aaa03d717fbfad080c4566d59e35"
+    },
+    "retrieval_arxiv_khop_fair_ablation_q100_seed20260607_summary.csv": {
+      "rows": 1017,
+      "columns": 34,
+      "sha256": "4862e2e7ec4e3659aa6d5d69fb6e89e473de335846b7caf52374c6a18cdf1050"
+    },
+    "retrieval_arxiv_khop_fair_ablation_q100_seed20260608_summary.csv": {
+      "rows": 1017,
+      "columns": 34,
+      "sha256": "96832924f0bcb7b20adced9ff92aba4e4b44847c67f0e6d25b6af2132b0e5a0a"
+    },
+    "retrieval_arxiv_khop_v7_candidates_q100_seed20260607_summary.csv": {
+      "rows": 471,
+      "columns": 34,
+      "sha256": "cfdc5fa003f91d0ad82f77a5277d16d1135569c64966ca3ff55b5b90c395436e"
+    },
+    "retrieval_arxiv_khop_v7_candidates_q100_seed20260608_summary.csv": {
+      "rows": 471,
+      "columns": 34,
+      "sha256": "40c1cd93b7492cbd7348b9976909134a00ce9275798810f5a56957187614a373"
+    }
+  }
+}
