@@ -1,18 +1,18 @@
 # Canonical paper-matching headline numbers. Source of truth = ../CANONICAL_SOURCES.md.
-# Production matrix (per dataset x method); budget K = half-partition (Cora 10 / Arxiv 100 / MAG 1000).
+# Production matrix (per dataset x method); bounded methods use half-partition K=10/100/1000, FilterAll uses the all-partition ceiling.
 dataset,budget_K,method,pos_exact_solve_rate_pct,avg_candidate_nodes_K,provenance
-Cora,10,Jigsaw,94.2,2.5,"deployed seed7203 walk-aware (MAG) / overlap-graphsage-v3 (Cora,Arxiv)"
-Cora,10,Mean-RRF,93.8,2.4,"RRF fusion of learned+mean, same encoders"
-Cora,10,MeanFeat,88.8,3.5,encoder-independent (mean_feature)
-Cora,10,TopoFeat,33.4,9.5,encoder-independent (topo_feature)
-Cora,10,Random,31.3,9.6,encoder-independent (random)
-Cora,10,FilterAll,100.0,0.8,"exhaustive ceiling, budget-independent (all partitions)"
-Arxiv,100,Jigsaw,92.8,0.2,"deployed seed7203 walk-aware (MAG) / overlap-graphsage-v3 (Cora,Arxiv)"
-Arxiv,100,Mean-RRF,94.0,0.2,"RRF fusion of learned+mean, same encoders"
-Arxiv,100,MeanFeat,88.9,0.2,encoder-independent (mean_feature)
-Arxiv,100,TopoFeat,33.2,0.3,encoder-independent (topo_feature)
-Arxiv,100,Random,37.7,0.3,encoder-independent (random)
-Arxiv,100,FilterAll,100.0,0.1,"exhaustive ceiling, budget-independent (all partitions)"
+Cora,10,Jigsaw,94.2,0.458,"canonical matched-budget run; terminal domain at K<=10"
+Cora,10,Mean-RRF,93.8,0.485,"canonical matched-budget run; terminal domain at K<=10"
+Cora,10,MeanFeat,87.7,1.131,"canonical matched-budget run; terminal domain at K<=10"
+Cora,10,TopoFeat,31.9,7.603,"canonical matched-budget run; terminal domain at K<=10"
+Cora,10,Random,32.7,7.541,"canonical matched-budget run; terminal domain at K<=10"
+Cora,20,FilterAll,100.0,0.059,"canonical exhaustive ceiling; terminal domain at K=20"
+Arxiv,100,Jigsaw,92.8,0.077,"canonical matched-budget run; terminal domain at K<=100"
+Arxiv,100,Mean-RRF,94.0,0.075,"canonical matched-budget run; terminal domain at K<=100"
+Arxiv,100,MeanFeat,89.7,0.091,"canonical matched-budget run; terminal domain at K<=100"
+Arxiv,100,TopoFeat,33.3,0.233,"canonical matched-budget run; terminal domain at K<=100"
+Arxiv,100,Random,39.2,0.219,"canonical matched-budget run; terminal domain at K<=100"
+Arxiv,200,FilterAll,100.0,0.057,"canonical exhaustive ceiling; terminal domain at K=200"
 MAG,1000,Jigsaw,88.6,138.1,"deployed seed7203 walk-aware (MAG) / overlap-graphsage-v3 (Cora,Arxiv)"
 MAG,1000,Mean-RRF,85.4,137.1,"RRF fusion of learned+mean, same encoders"
 MAG,1000,MeanFeat,64.6,212.1,encoder-independent (mean_feature)

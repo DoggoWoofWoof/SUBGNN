@@ -47,6 +47,7 @@ from scripts.benchmark_overlap_glasgow_cascade import (
     prune_nodes_by_signature,
     query_label_counts,
     component_covers_query_labels,
+    derive_query_labels,
     load_or_prepare_hierarchy,
     load_or_build_overlap_index,
     safe_cache_key,
@@ -273,11 +274,13 @@ def run_streaming(args):
     for q_number, item in enumerate(queries, start=1):
         query = item["query"]
         query_nodes = [int(n) for n in item["query_nodes"].tolist()]
-        # query labels under the stored label source, if labels are present
-        q_labels = None
-        if label_tokens is not None:
-            q_labels = [int(x) for x in label_tokens[item["query_nodes"].long()].tolist()]
-            query.node_label = label_tokens[item["query_nodes"].long()].long()
+        # Derive query labels from the request payload; planted IDs are metrics only.
+        q_labels = derive_query_labels(
+            query,
+            meta.get("label_source", "feature"),
+            class_venue_base=meta.get("class_venue_base"),
+        )
+        query.node_label = torch.tensor(q_labels, dtype=torch.long)
 
         ranking, retrieval_time = build_faiss_ranking(
             query, encoder, device, faiss_index, faiss_to_coarse
@@ -305,7 +308,12 @@ def run_streaming(args):
             fetch1_s = time.perf_counter() - _t
             # node-level pruning (global coverage) -- reuses the cascade operators
             _t = time.perf_counter()
-            pruned_nodes = prune_nodes_by_signature(accumulated_nodes, query_nodes, tokens)
+            pruned_nodes = prune_nodes_by_signature(
+                accumulated_nodes,
+                query,
+                tokens,
+                meta.get("signature", "none"),
+            )
             pruned_nodes = prune_nodes_by_query_label_tokens(
                 pruned_nodes, query, label_tokens, query_labels=q_labels
             )
@@ -390,6 +398,7 @@ def run_streaming(args):
                     "query_type": item.get("query_type", ""),
                     "target_query_size": item.get("target_query_size", 0),
                     "query_nodes": query.num_nodes,
+                    "query_pruning_source": "query_payload_v1",
                     "budget": budget,
                     "retrieved_parts": len(selected),
                     "parts_read_pass2": _parts_read,

@@ -1,0 +1,114 @@
+{
+  "status": "pass",
+  "workload_id": "jigsaw-production-20260607-08-q50-v1",
+  "query_pruning_source": "query_payload_v1",
+  "unique_queries": 7200,
+  "positive_queries": 5400,
+  "negative_queries": 1800,
+  "expectations_met": 7200,
+  "positive_payload_equals_legacy_tokens": 5400,
+  "negative_label_payload_intentionally_diverges": 900,
+  "datasets": {
+    "cora": {
+      "unique_queries": 2400,
+      "positive_queries": 1800,
+      "negative_queries": 600,
+      "expectations_met": 2400,
+      "positive_payload_equals_legacy_tokens": 1800,
+      "negative_label_payload_intentionally_diverges": 300
+    },
+    "arxiv": {
+      "unique_queries": 2400,
+      "positive_queries": 1800,
+      "negative_queries": 600,
+      "expectations_met": 2400,
+      "positive_payload_equals_legacy_tokens": 1800,
+      "negative_label_payload_intentionally_diverges": 300
+    },
+    "mag": {
+      "unique_queries": 2400,
+      "positive_queries": 1800,
+      "negative_queries": 600,
+      "expectations_met": 2400,
+      "positive_payload_equals_legacy_tokens": 1800,
+      "negative_label_payload_intentionally_diverges": 300
+    }
+  },
+  "negative_reruns": {
+    "cora": {
+      "production_validation": {
+        "dataset": "cora",
+        "canonical_unique_negative_queries": 600,
+        "policy_query_files": 12,
+        "per_budget_rows": 12600,
+        "query_types": [
+          "negative_label",
+          "negative_structure"
+        ],
+        "seeds": [
+          20260607,
+          20260608
+        ],
+        "target_sizes": [
+          20,
+          50,
+          100
+        ],
+        "query_pruning_source": "query_payload_v1"
+      },
+      "per_query_files": 12,
+      "per_budget_rows": 12600,
+      "unique_negative_queries": 600
+    },
+    "arxiv": {
+      "production_validation": {
+        "dataset": "arxiv",
+        "canonical_unique_negative_queries": 600,
+        "policy_query_files": 12,
+        "per_budget_rows": 12600,
+        "query_types": [
+          "negative_label",
+          "negative_structure"
+        ],
+        "seeds": [
+          20260607,
+          20260608
+        ],
+        "target_sizes": [
+          20,
+          50,
+          100
+        ],
+        "query_pruning_source": "query_payload_v1"
+      },
+      "per_query_files": 12,
+      "per_budget_rows": 12600,
+      "unique_negative_queries": 600
+    },
+    "mag": {
+      "production_validation": {
+        "dataset": "mag",
+        "canonical_unique_negative_queries": 600,
+        "policy_query_files": 12,
+        "per_budget_rows": 18581,
+        "query_types": [
+          "negative_label",
+          "negative_structure"
+        ],
+        "seeds": [
+          20260607,
+          20260608
+        ],
+        "target_sizes": [
+          20,
+          50,
+          100
+        ],
+        "query_pruning_source": "query_payload_v1"
+      },
+      "per_query_files": 12,
+      "per_budget_rows": 18581,
+      "unique_negative_queries": 600
+    }
+  }
+}

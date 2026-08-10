@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "max_teamspace_storage_bytes": 20000000000,
+  "max_versions_per_artifact": 1,
+  "upload_limits_bytes": {
+    "overlay": 250000000,
+    "results": 500000000,
+    "package": 5000000000
+  },
+  "results_allowed_extensions": [
+    ".csv",
+    ".json",
+    ".log",
+    ".md",
+    ".txt",
+    ".tsv"
+  ],
+  "results_forbidden_path_parts": [
+    "build",
+    "cache",
+    "data",
+    "models",
+    "parts",
+    "store"
+  ],
+  "canonical_package_allowlist": [
+    "jigsaw-production-benchmark-package-mag-walkaware-targeted-v1",
+    "jigsaw-cora-arxiv-streaming-overlay-v6",
+    "jigsaw-noid-pruning-overlay-v4-canonical-shorttags",
+    "jigsaw-subgraphmatching-overlay-v16-exactsolvers-arxiv-mag",
+    "jigsaw-subgraphmatching-cora-baseline-package-v1"
+  ],
+  "protected_artifact_allowlist": [
+    "jigsaw-mag-deployed-walkaware-seed7203"
+  ],
+  "rules": [
+    "Upload results from a dedicated staging directory, never a workspace or cache parent.",
+    "Results contain tables, manifests, and logs only; no datasets, checkpoints, graph exports, build trees, or partition stores.",
+    "Keep one artifact version unless a paper explicitly cites an older immutable version.",
+    "Fail run preflight when unallowlisted artifacts or excess versions remain in the primary teamspace.",
+    "Run scripts/ops/validate_lightning_upload.py before every model-store upload.",
+    "Run a storage inventory after every benchmark campaign and prune superseded artifacts."
+  ]
+}

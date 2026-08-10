@@ -106,6 +106,15 @@ def main() -> None:
     parser.add_argument("--queries", type=int, default=50)
     parser.add_argument("--target-sizes", default="20,50,100")
     parser.add_argument("--query-types", default="all")
+    parser.add_argument(
+        "--evaluation-query-types",
+        default="",
+        help=(
+            "Optional family subset evaluated from the canonical cache described by "
+            "--query-types. Query generation and manifest validation still use the "
+            "full --query-types specification."
+        ),
+    )
     parser.add_argument("--seeds", default="20260607,20260608")
     parser.add_argument("--methods", default="neural_component,random_component,mean_feature_component,mean_rrf_component,filterall_component")
     parser.add_argument("--ablation-set", choices=["none", "full"], default="none")
@@ -123,6 +132,14 @@ def main() -> None:
     parser.add_argument("--cache-dir", default="cache/overlap_cascade")
     parser.add_argument("--output-dir", default="runs/lightning_mag_benchmark_results")
     parser.add_argument("--output-prefix", default="prod_mag_rgcn")
+    parser.add_argument(
+        "--run-tag",
+        default="",
+        help=(
+            "Optional compact identifier used in result/log filenames. This does not "
+            "change the canonical query specification recorded inside each CSV."
+        ),
+    )
     parser.add_argument("--glasgow-bin", default=os.environ.get("GLASGOW_SOLVER_BIN", "glasgow_subgraph_solver"))
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--parallel-mode", choices=["task", "query"], default="task")
@@ -163,10 +180,13 @@ def main() -> None:
         if manifest_has_query_cache(args.cache_dir, seed, args.queries, args.target_sizes, args.query_types):
             print(f"[QUERY CACHE] manifest hit seed={seed}; skipping generation", flush=True)
             continue
-        tag = (
-            f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(args.query_types)}"
-            f"_sizes{clean_tag(args.target_sizes)}_query_cache"
-        )
+        if args.run_tag:
+            tag = f"{args.output_prefix}_s{seed}_{clean_tag(args.run_tag)}_query_cache"
+        else:
+            tag = (
+                f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(args.query_types)}"
+                f"_sizes{clean_tag(args.target_sizes)}_query_cache"
+            )
         cmd = [
             py, "scripts/benchmark_overlap_glasgow_cascade.py",
             "--dataset", args.dataset,
@@ -193,10 +213,18 @@ def main() -> None:
             cascade_method, sig, method_budgets, component_solve, prune_labels, use_overlap, needs_models = method_config(
                 method, args.signature, args.budgets, args.full_budget
             )
-            tag = (
-                f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(args.query_types)}"
-                f"_sizes{clean_tag(args.target_sizes)}_{method}_b{clean_tag(method_budgets)}"
-            )
+            if args.run_tag:
+                tag = (
+                    f"{args.output_prefix}_s{seed}_{clean_tag(args.run_tag)}_"
+                    f"{method}_b{clean_tag(method_budgets)}"
+                )
+            else:
+                tag = (
+                    f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(args.query_types)}"
+                    f"_sizes{clean_tag(args.target_sizes)}_{method}_b{clean_tag(method_budgets)}"
+                )
+                if args.evaluation_query_types:
+                    tag += f"_eval_{clean_tag(args.evaluation_query_types)}"
             output_prefix = result_dir / tag
             summary = Path(f"{output_prefix}_summary.csv")
             per_query = Path(f"{output_prefix}_per_query.csv")
@@ -221,6 +249,8 @@ def main() -> None:
                 "--cache-dir", args.cache_dir,
                 "--max-component-diag-nodes", str(args.max_component_diag_nodes),
             ]
+            if args.evaluation_query_types:
+                cmd.extend(["--evaluation-query-types", args.evaluation_query_types])
             cmd.extend(OVERLAP_POLICY_FLAGS.get(method, []))
             if args.label_source and args.label_source != "feature":
                 cmd.extend(["--label-source", args.label_source])

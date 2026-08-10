@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "workload_id": "jigsaw-production-20260607-08-q50-v1",
+  "query_identity": "dataset,seed,query_type,target_size,query_index",
+  "datasets": ["cora", "arxiv", "mag"],
+  "seeds": [20260607, 20260608],
+  "target_sizes": [20, 50, 100],
+  "queries_per_cell": 50,
+  "positive_query_types": [
+    "single",
+    "multi_fine",
+    "k_hop",
+    "degree_k_hop",
+    "random_walk",
+    "multi_coarse"
+  ],
+  "negative_query_types": [
+    "negative_label",
+    "negative_structure"
+  ],
+  "counts_per_dataset": {
+    "unique_positive_queries": 1800,
+    "unique_negative_queries": 600,
+    "unique_total_queries": 2400
+  },
+  "main_policies": [
+    "jigsaw",
+    "mean_feat",
+    "mean_rrf",
+    "topo_feat",
+    "random",
+    "filter_all"
+  ],
+  "matrix_counts_per_dataset": {
+    "summary_rows_before_budget_expansion": 288,
+    "policy_query_evaluations_before_budget_expansion": 14400
+  },
+  "reporting_rules": [
+    "Use 2400 only for the complete positive-plus-negative production workload.",
+    "Use 1800 only when a table or test is explicitly restricted to positive queries.",
+    "Use 600 only when a table or test is explicitly restricted to negative queries.",
+    "Never call policy-by-query or budget-by-query CSV rows unique queries.",
+    "Diagnostic subsets must include their own workload_id and must not be merged into production percentages."
+  ],
+  "diagnostic_workloads": {
+    "operator_ablation": {
+      "workload_id": "jigsaw-operator-ablation-20260607-q2-v1",
+      "unique_queries_per_dataset": 48,
+      "positive_queries_per_dataset": 36,
+      "reported_budget_fraction": 0.5,
+      "reported_budgets": {
+        "arxiv": 100,
+        "mag": 1000
+      },
+      "candidate_metric": "mean pruned_candidate_nodes at first solved row at or below the reporting budget, otherwise the largest attempted row at or below the reporting budget",
+      "purpose": "shared operator-necessity subset reported at matched half-partition budgets"
+    },
+    "paired_scaling": {
+      "workload_id": "jigsaw-paired-scaling-20260607-q5-khop-v2",
+      "unique_queries_per_small_dataset": 15,
+      "reported_budget_fraction": 0.5,
+      "reported_budgets": {
+        "cora": 10,
+        "arxiv": 100,
+        "mag_production_context": 1000
+      },
+      "purpose": "same-query direct-solver comparison with Jigsaw reported at matched half-partition budgets"
+    },
+    "mag_streaming": {
+      "workload_id": "jigsaw-mag-streaming-20260607-q3-positive-v1",
+      "unique_queries": 54,
+      "purpose": "systems memory and latency subset"
+    }
+  }
+}

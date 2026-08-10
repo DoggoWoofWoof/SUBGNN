@@ -1,6 +1,21 @@
 # Benchmark Summary Index
 
-The current benchmark source of truth is the final conference bundle:
+The current paper-facing source of truth is the matched production bundle:
+
+- `benchmarks/paper_results/final_results/HEADLINE_NUMBERS.csv`
+- `benchmarks/paper_results/final_results/production_matched_costs.csv`
+- `benchmarks/paper_results/final_results/production_matched_costs_by_family_size.csv`
+- `benchmarks/paper_results/final_results/query_payload_v1_validation.json`
+
+These files define the canonical 2,400-query workload per dataset: 1,800
+planted positives and 600 audited negatives across two seeds, eight families,
+and three sizes. Cora and Arxiv bounded policies are reported at half the
+partition count; `FilterAll` is explicitly the exhaustive all-partition
+ceiling. Candidate and cascade-cost columns use the same reporting endpoint as
+the solve rate.
+
+The following normalized grids are retained as legacy/full-grid diagnostics,
+not as the source for paper headline rows:
 
 - `benchmarks/paper_results/final_results/final_all_datasets_summary.csv`
 - `benchmarks/paper_results/final_results/final_mag_summary.csv`
@@ -13,11 +28,15 @@ Ablation evidence is in:
 
 - `benchmarks/paper_results/ablations/`
 
-This file intentionally does not duplicate table values. Regenerate paper tables directly from the normalized CSVs above to avoid stale copied numbers. The validation report confirms that the canonical CSVs have explicit `dataset`/`seed` fields, no blank or partial rows, no duplicate summary slices, and that `final_all_datasets_summary.csv` is exactly the union of the three dataset summaries.
+Regenerate paper tables from the matched production files and run
+`validate_paper_budget_fairness.py`; do not copy headline values from the
+legacy full-grid summaries. The validation reports confirm explicit
+dataset/seed fields, no blank final rows, and no duplicate summary slices.
 
 Budget reporting note: `first_solved_at_<B>` is an exact first-hit bucket; `solved_by_<B>` is cumulative and should be used for paper budget curves. The older `solved_at_<B>` columns are retained only for backward compatibility.
 
-Overlap-trained GraphSAGE postscript: the newer Cora/Arxiv overlap-aware GraphSAGE benchmark reruns are validated locally but are not yet folded into the canonical `benchmarks/paper_results/final_results/` bundle. Their artifacts are:
+The overlap-aware GraphSAGE reruns remain diagnostic checkpoint studies rather
+than the paper's matched production matrix. Their artifacts are:
 
 - `runs/lightning_completion/jigsaw-cora-overlap-graphsage-bench-gcp-cpux8-v3`
 - `runs/lightning_completion/jigsaw-arxiv-overlap-graphsage-bench-gcp-cpux8-v3`
@@ -26,7 +45,9 @@ Overlap-trained GraphSAGE postscript: the newer Cora/Arxiv overlap-aware GraphSA
 - `runs/diagnostics/overlap_graphsage_benchmark_budget_curve.csv`
 - `runs/diagnostics/overlap_graphsage_benchmark_by_query_type_size.csv`
 
-Both datasets validate at 2,400 logical queries per method/checkpoint label across two seeds, with 1,800 positives solved, 600 negatives correctly rejected, and 100% positive full coverage for both `best_fullcov` and final checkpoints. Cora remains saturated and should be framed as a feasibility/cost check. Arxiv also reaches 100% end-to-end solves in this benchmark, so the paper should use these rows to discuss checkpoint choice and candidate/latency behavior rather than claiming a new solve-rate separation.
+Both datasets validate at 2,400 logical queries per method/checkpoint label
+across two seeds. Their full-coverage results are checkpoint diagnostics, not
+the matched half-budget solve rates in the production table.
 
 Query-family interpretation note: the current `multi_coarse` family is a
 disconnected multi-region diagnostic, not the headline connected-query family.
@@ -45,4 +66,4 @@ Current expanded manuscript assets:
 - `fig_mag_tradeoff.png`: MAG candidate-size/solve-rate tradeoff.
 - `fig_jigsaw_query_family_heatmap.png`: Jigsaw query-family outcomes.
 - `fig_jigsaw_budget_curves.png`: cumulative solved-by-budget curves.
-- `fig_design_ablation.png`: Arxiv pruning/component/exact-label diagnostic ablation.
+- `fig_design_ablation.png`: matched half-partition MAG/Arxiv operator-necessity diagnostic.

@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-20T18:41:13.546567+00:00",
+  "generated_at_utc": "2026-08-01T17:41:36.314281+00:00",
   "status": "pass",
   "issues": [],
   "production_rows": {
@@ -8,5 +8,16 @@
     "mag": 288
   },
   "all_datasets_rows": 864,
+  "canonical_unique_queries": {
+    "per_dataset": 2400,
+    "positive_per_dataset": 1800,
+    "negative_per_dataset": 600,
+    "all_datasets": 7200
+  },
+  "query_payload_v1_audit": {
+    "expectations_met": 7200,
+    "positive_equivalent": 5400,
+    "negative_label_diverged": 900
+  },
   "diagnostic_rows_preserved": 222
 }

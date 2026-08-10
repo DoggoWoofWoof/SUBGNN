@@ -6,6 +6,10 @@ This repository is currently organized for the conference submission. Raw cloud 
 
 **New to the codebase?** See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a full component map — the four-stage pipeline, every `src/` module and `scripts/` group, how to run each workflow, artifact layout, and the monolith-decomposition plan.
 
+### Submission status
+
+Submission builds are in `paper/` — proceedings-track manuscript `jigsaw_log2026.tex` (OpenReview) and the ECML-PKDD variant `jigsaw_ecmlpkdd.tex`; metadata in `paper/openreview_submission_metadata.md`. Headline: a FullCov-trained GNN retrieval layer for exact Glasgow matching recovers **88.6%** of full-MAG positives under **2.4 GB** residence (vs 10.2 GB whole-graph; direct Glasgow solves 0/15), with boundary overlap nearly doubling matched-half-budget recovery (44.4% → 88.9%) and query-derived pruning provably lossless. Every manuscript number is re-checkable from the committed CSVs via the `scripts/analysis/validate_*.py` suite (budget fairness, benchmark denominators, query-derived pruning, matched production costs) and `scripts/analysis/reproduce_paper_numbers.py`.
+
 ## Final Results
 
 Canonical summary files:

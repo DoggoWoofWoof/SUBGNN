@@ -211,6 +211,20 @@ def build_coarse_overlap_index(data, hierarchy):
 def _node_type_tensor(data):
     if hasattr(data, "node_type") and data.node_type is not None:
         return data.node_type.detach().cpu().long()
+    # Older cached MAG queries predate preservation of ``node_type`` during
+    # subgraph extraction.  The query payload still carries the exact type
+    # one-hot block in x, so recover it without consulting target/global IDs.
+    if (
+        getattr(data, "feature_schema", None) == "mag_type_rel_v1"
+        and hasattr(data, "node_types")
+        and data.x is not None
+    ):
+        type_start = 128
+        type_width = len(data.node_types)
+        type_end = type_start + type_width
+        if type_width > 0 and int(data.x.size(1)) >= type_end:
+            type_features = data.x.detach().cpu().float()[:, type_start:type_end]
+            return torch.argmax(type_features, dim=1).long()
     return torch.zeros(data.num_nodes, dtype=torch.long)
 
 
@@ -425,7 +439,7 @@ def overlap_node_metrics(item, selected_ids, hierarchy):
     covered = len(query_nodes) - len(missed)
     signature_start = time.perf_counter()
     signature_metrics = signature_pruning_metrics(
-        query_nodes, selected, hierarchy, candidate_nodes_upper_bound
+        item["query"], selected, hierarchy, candidate_nodes_upper_bound
     )
     signature_time = time.perf_counter() - signature_start
     return {
@@ -442,18 +456,20 @@ def overlap_node_metrics(item, selected_ids, hierarchy):
     }
 
 
-def signature_pruning_metrics(query_nodes, selected, hierarchy, overlap_candidate_nodes):
+def signature_pruning_metrics(query, selected, hierarchy, overlap_candidate_nodes):
     pruning_index = hierarchy.get("signature_pruning_index")
     if not pruning_index:
         return {}
 
     metrics = {}
-    query_tensor = torch.tensor(query_nodes, dtype=torch.long)
+    query_tokens_by_name = _build_node_signature_tokens(query)
     for name in SIGNATURE_PRUNING_STRATEGIES:
         index = pruning_index.get(name)
         if not index:
             continue
-        query_tokens = set(int(x) for x in index["tokens"][query_tensor].tolist())
+        query_tokens = set(
+            int(x) for x in query_tokens_by_name[name].detach().cpu().tolist()
+        )
         pruned_count = 0
         part_counts = index["part_counts"]
         overlap_counts = index["overlap_counts"]

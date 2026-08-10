@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-07-12T18:32:28+00:00",
-  "note": "Canonical production-only CSV bundle. HEADLINE_NUMBERS.csv holds the paper-matching headline (deployed encoders); the per-config final_*_summary.csv neural/Mean-RRF rows are a superseded run (see README). Manifest refreshed to match current post-connected-merge files.",
+  "generated_at_utc": "2026-08-01T17:41:36.314281+00:00",
+  "note": "Canonical production bundle with query-payload-v1 negative reruns merged; positive rows are unchanged and audited equivalent.",
   "validation": {
-    "generated_at_utc": "2026-06-20T18:41:13.546567+00:00",
+    "generated_at_utc": "2026-08-01T17:41:36.314281+00:00",
     "status": "pass",
     "issues": [],
     "production_rows": {
@@ -11,6 +11,17 @@
       "mag": 288
     },
     "all_datasets_rows": 864,
+    "canonical_unique_queries": {
+      "per_dataset": 2400,
+      "positive_per_dataset": 1800,
+      "negative_per_dataset": 600,
+      "all_datasets": 7200
+    },
+    "query_payload_v1_audit": {
+      "expectations_met": 7200,
+      "positive_equivalent": 5400,
+      "negative_label_diverged": 900
+    },
     "diagnostic_rows_preserved": 222
   },
   "coverage_status_counts": {
@@ -18,20 +29,20 @@
   },
   "files": {
     "HEADLINE_NUMBERS.csv": {
-      "bytes": 3903,
-      "sha256": "4c549c77b67dfc31ebd4b610791c79a432e583fd37822635710e54b02fc660a0",
-      "rows": 34,
-      "columns": 7
+      "bytes": 4383,
+      "sha256": "988005fad664dbed0f7c66aa17f405a1038c69e7bd6407787da02b0ac32fefd1",
+      "rows": 48,
+      "columns": 1
     },
     "README.md": {
-      "bytes": 4023,
-      "sha256": "713ee0d116ccc82b13e48ed5ad849bb476972b8559ed610f29c01a579b3de6a9",
+      "bytes": 5242,
+      "sha256": "86e8c0889853892e2c6da01fa42eff9cc7999f76f7ff05ebc303c58638eca1e7",
       "rows": null,
       "columns": null
     },
     "benchmark_grid_coverage_report.json": {
-      "bytes": 345,
-      "sha256": "08cca70d02c2ab2c0c63d7c89faec6f9e7849f6ea315d1dcb9f38b58d6871112",
+      "bytes": 347,
+      "sha256": "0f54d8a226a2feed32e690160acab5a613ee423e6f990deab3c4c2549189b118",
       "rows": null,
       "columns": null
     },
@@ -42,22 +53,22 @@
       "columns": null
     },
     "csv_validation_report.json": {
-      "bytes": 249,
-      "sha256": "83466ef2b7cc0be2a1a572e044ba9db98577fe96b8f76113ac1ec28465680f82",
+      "bytes": 549,
+      "sha256": "e3624dabd4d54e7f869d227e3846b7f72cab871f66c056ba2749522f526a1e50",
       "rows": null,
       "columns": null
     },
     "final_all_datasets_summary.csv": {
-      "bytes": 715564,
-      "sha256": "80947750ff55f1e70df40d56ad2171a46c8c7cc5684520730b91097e6fc3284a",
+      "bytes": 780539,
+      "sha256": "17e92fe4029bf0986307594a674fbef8cf66e3792a749a05814510a63f30bd08",
       "rows": 864,
-      "columns": 186
+      "columns": 187
     },
     "final_arxiv_summary.csv": {
-      "bytes": 237559,
-      "sha256": "a68ea39c575aba72edc66cfa6325844c715314f2f25fbf18eabb67991aa3dc18",
+      "bytes": 258608,
+      "sha256": "06c2d205e1e35268de39b0286c5374d849f537139ab2282902481f517e1dd19c",
       "rows": 288,
-      "columns": 186
+      "columns": 187
     },
     "final_benchmark_completion_audit.csv": {
       "bytes": 8932,
@@ -66,10 +77,10 @@
       "columns": 60
     },
     "final_cora_summary.csv": {
-      "bytes": 241309,
-      "sha256": "81ddf6026eb5f1f96b87093007b7105de6a4c46a82f213a21a1d6d273883a5fb",
+      "bytes": 262977,
+      "sha256": "1c1f8fc85124ef05bc2801cf021fe3c0aa70f6c7a2ae7b6bc0e5ce83a8d352e6",
       "rows": 288,
-      "columns": 186
+      "columns": 187
     },
     "final_diagnostic_model_ablation_summary.csv": {
       "bytes": 175977,
@@ -78,16 +89,22 @@
       "columns": 186
     },
     "final_mag_summary.csv": {
-      "bytes": 244452,
-      "sha256": "8366faf38ac35416a0346dff6f451018f28d5c6ac8193a4038f6d273d6d6b5e9",
+      "bytes": 266752,
+      "sha256": "adc41950f0e237b090471a914a1ecf2e783b5def42792a6f9dfd0bc0a98fd4ad",
       "rows": 288,
-      "columns": 186
+      "columns": 187
     },
     "production_grid_coverage.csv": {
-      "bytes": 61400,
-      "sha256": "9a0aee30f71ad932ee2bc448c60c395f1d6e6e7eaa6e94f96766a022438c237b",
+      "bytes": 63417,
+      "sha256": "3dfb86779108cb70a5bf01ed869f89bcbb46840350dae03abfd9d86b147c445c",
       "rows": 864,
       "columns": 10
+    },
+    "query_payload_v1_validation.json": {
+      "bytes": 3076,
+      "sha256": "0e68c96b481af17d3ae80c6bbc1cd7ab39d35e42a73dd25f31714305a35ca962",
+      "rows": null,
+      "columns": null
     }
   }
 }

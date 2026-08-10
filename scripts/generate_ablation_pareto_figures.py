@@ -1,5 +1,6 @@
 """Generate the combined MAG+Arxiv design-ablation figure and the memory<->latency
-Pareto figure from the final verified runs (2026-07). Values hardcoded from:
+Pareto figure from the final verified runs (2026-07). Values are summarized at
+matched half-partition budgets from:
   - runs/mag_design_ablation_v2_dl (48-query shared set)
   - runs/arxiv_design_ablation_v1_dl (48-query shared set)
   - runs/{cora_arxiv_pareto_v1_dl, mag_pareto_v1_dl} (cache sweep)
@@ -14,8 +15,8 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parents[1] / "paper"
 
 VARIANTS = ["Full", "No\noverlap", "No\nsignature", "No\ncomponents", "No\nexact-label"]
-MAG_SOLVE = [88.9, 44.4, 88.9, 63.9, 52.8]           # positive solve rate (positives only, /36)
-ARXIV_CAND = [94, 97, 7081, 94, 223]                 # avg candidate nodes
+MAG_SOLVE = [88.9, 44.4, 88.9, 63.9, 52.8]  # K=1000/2000; positives only, n=36
+ARXIV_CAND = [76, 88, 2815, 76, 244]         # K=100/200; mean pruned nodes, n=36
 
 
 def design_ablation():
@@ -25,7 +26,7 @@ def design_ablation():
     colors = ["#1f77b4", "#d62728", "#1f77b4", "#ff7f0e", "#ff7f0e"]
     ax[0].bar(x, MAG_SOLVE, color=colors)
     ax[0].axhline(88.9, ls="--", lw=1, color="#555")
-    ax[0].set_title("MAG: overlap is the lever\n(positive solve rate, shared query set)")
+    ax[0].set_title("MAG at K=1,000/2,000: overlap is the lever\n(positive solve rate, n=36)")
     ax[0].set_ylabel("Positive solve rate (%)")
     ax[0].set_ylim(0, 105)
     for i, v in enumerate(MAG_SOLVE):
@@ -34,8 +35,8 @@ def design_ablation():
     colorsa = ["#1f77b4", "#1f77b4", "#d62728", "#1f77b4", "#ff7f0e"]
     ax[1].bar(x, ARXIV_CAND, color=colorsa)
     ax[1].set_yscale("log")
-    ax[1].set_title("Arxiv: signature is the lever\n(candidate nodes, log)")
-    ax[1].set_ylabel("Avg candidate nodes")
+    ax[1].set_title("Arxiv at K=100/200: signature is the lever\n(mean pruned candidate nodes, n=36; log)")
+    ax[1].set_ylabel("Mean pruned candidate nodes")
     ax[1].set_ylim(50, 20000)
     for i, v in enumerate(ARXIV_CAND):
         ax[1].text(i, v * 1.15, f"{v:,}", ha="center", fontsize=9)

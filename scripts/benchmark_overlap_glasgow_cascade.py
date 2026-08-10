@@ -405,6 +405,68 @@ def load_or_build_feature_bucket_label_tokens(data, cache_dir, cache_key, bucket
     return labels
 
 
+def derive_query_labels(query, label_source="feature", class_venue_base=None):
+    """Derive solver labels solely from the query payload.
+
+    Planted global node IDs are evaluation metadata and must never determine
+    serving-time candidate labels.  Feature and bucket labels are deterministic
+    from query.x.  Class-labelled queries must carry y or node_label, just as an
+    external query request would.
+    """
+    label_source = str(label_source or "feature")
+    if label_source == "feature":
+        if query.x is None:
+            raise ValueError("feature labels require query.x")
+        return [feature_to_label(query.x[i]) for i in range(query.num_nodes)]
+    if label_source.startswith("feature_bucket_"):
+        if query.x is None:
+            raise ValueError("feature-bucket labels require query.x")
+        bucket_count = int(label_source.rsplit("_", 1)[-1])
+        if bucket_count <= 0:
+            raise ValueError(f"feature bucket count must be positive, got {bucket_count}")
+        return [
+            _feature_bucket_hash_int(query.x[i]) % bucket_count
+            for i in range(query.num_nodes)
+        ]
+    if label_source == "class":
+        explicit = getattr(query, "node_label", None)
+        if isinstance(explicit, torch.Tensor) and int(explicit.numel()) == int(query.num_nodes):
+            return [int(value) for value in explicit.detach().cpu().view(-1).tolist()]
+        y = getattr(query, "y", None)
+        if not isinstance(y, torch.Tensor) or int(y.numel()) != int(query.num_nodes):
+            raise ValueError(
+                "class labels require query.y or query.node_label; regenerate legacy "
+                "query caches so labels are stored in the query payload"
+            )
+        if class_venue_base is None:
+            nonnegative = y.detach().cpu().view(-1).long()
+            class_venue_base = (
+                int(nonnegative[nonnegative >= 0].max()) + 1
+                if bool((nonnegative >= 0).any())
+                else 1
+            )
+        from benchmark_retrieval import _node_type_tensor
+
+        node_type = _node_type_tensor(query)
+        y = y.detach().cpu().view(-1).long()
+        within_type = torch.where(y >= 0, y, torch.zeros_like(y))
+        values = node_type * int(class_venue_base) + within_type
+        return [int(value) for value in values.tolist()]
+    raise ValueError(f"Unknown label source: {label_source}")
+
+
+def derive_query_signature_tokens(query, signature_name):
+    """Build the active signature from query attributes, never target IDs."""
+    if not signature_name or signature_name == "none":
+        return torch.zeros(0, dtype=torch.long)
+    query_tokens_by_name = _build_node_signature_tokens(query)
+    if signature_name not in query_tokens_by_name:
+        raise ValueError(
+            f"Unknown signature {signature_name}; options: {sorted(query_tokens_by_name)}"
+        )
+    return torch.unique(query_tokens_by_name[signature_name].detach().cpu().long())
+
+
 def build_or_load_faiss_index(data, hierarchy, encoder, device, model_path, cache_dir, cache_key):
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
@@ -871,13 +933,12 @@ def selective_overlap_for_parts(
     return nodes
 
 
-def prune_nodes_by_signature(nodes, query_nodes, signature_tokens):
+def prune_nodes_by_signature(nodes, query, signature_tokens, signature_name):
     if signature_tokens is None or not nodes:
         return nodes
-    # Vectorized: keep accumulated nodes whose signature token matches any query node's.
-    # Identical output to the per-node .item() loop, but torch.isin instead of Python.
-    query_tensor = torch.tensor([int(node) for node in query_nodes], dtype=torch.long)
-    query_tokens = torch.unique(signature_tokens[query_tensor].long())
+    # Keep accumulated nodes whose attribute signature matches a query node.
+    # Query tokens come from the query payload, not planted target/global IDs.
+    query_tokens = derive_query_signature_tokens(query, signature_name)
     node_tensor = torch.tensor(sorted(int(node) for node in nodes), dtype=torch.long)
     keep = torch.isin(signature_tokens[node_tensor].long(), query_tokens)
     return set(node_tensor[keep].tolist())
@@ -1506,6 +1567,7 @@ def run_one_model(
     # get distinct labels per type rather than collapsing into one junk bucket. Papers
     # are split by venue; homogeneous graphs (single type) reduce to the plain class.
     node_label_full = None
+    class_venue_base = None
     if label_source == "class":
         if not hasattr(data, "y") or data.y is None:
             raise ValueError("--label-source class requires node class labels data.y")
@@ -1516,6 +1578,7 @@ def run_one_model(
         else:
             node_type = torch.zeros(data.num_nodes, dtype=torch.long)
         venue_base = (int(y[y >= 0].max()) + 1) if bool((y >= 0).any()) else 1
+        class_venue_base = venue_base
         # nodes with a class (papers) -> their class; nodes without (-1) -> class 0,
         # then offset by node type so each type occupies a disjoint label band.
         within_type = torch.where(y >= 0, y, torch.zeros_like(y))
@@ -1622,6 +1685,8 @@ def run_one_model(
             "num_coarse": len(hierarchy["coarse_part_node_sets"]),
             "signature": signature_name or "none",
             "label_source": label_source,
+            "class_venue_base": class_venue_base,
+            "query_pruning_source": "query_payload_v1",
             "embedding_dim": int(data.x.size(1)) if data.x is not None else 0,
         }
         dump_partition_store(
@@ -1654,12 +1719,14 @@ def run_one_model(
         query_largest_component_nodes = query_component_sizes[0] if query_component_sizes else 0
         query_nodes = [int(node) for node in item["query_nodes"].tolist()]
         true_coarse = set(int(x) for x in item["true_coarse"])
-        # query labels under the chosen label source (class -> data.y; else feature hash)
-        if node_label_full is not None:
-            q_labels = [int(x) for x in node_label_full[item["query_nodes"].long()].tolist()]
-            query.node_label = node_label_full[item["query_nodes"].long()]
-        else:
-            q_labels = None
+        # Serving labels are derived from the query payload.  The planted IDs in
+        # item["query_nodes"] remain available only for coverage/accuracy audits.
+        q_labels = derive_query_labels(
+            query,
+            label_source=label_source,
+            class_venue_base=class_venue_base,
+        )
+        query.node_label = torch.tensor(q_labels, dtype=torch.long)
         if not needs_encoder:
             model_ranking, retrieval_time = [], 0.0
         else:
@@ -1730,7 +1797,9 @@ def run_one_model(
                     query_labels=q_labels,
                 )
                 overlap_full, overlap_missed_count = node_fullcov(query_nodes, overlap_nodes)
-                pruned_nodes = prune_nodes_by_signature(overlap_nodes, query_nodes, tokens)
+                pruned_nodes = prune_nodes_by_signature(
+                    overlap_nodes, query, tokens, signature_name
+                )
                 signature_candidate_nodes = len(pruned_nodes)
                 if prune_query_labels:
                     pruned_nodes = prune_nodes_by_query_label_tokens(pruned_nodes, query, label_tokens, query_labels=q_labels)
@@ -1823,6 +1892,7 @@ def run_one_model(
                 "expected_match": bool(item.get("expected_match", True)),
                 "target_query_size": item["target_query_size"],
                 "query_nodes": query.num_nodes,
+                "query_pruning_source": "query_payload_v1",
                 "query_component_count": query_component_count,
                 "query_largest_component_nodes": query_largest_component_nodes,
                 "full_graph_nodes": data.num_nodes,
@@ -2164,6 +2234,16 @@ def main():
     parser.add_argument("--no-boundary-overlap", action="store_true", help="skip one-hop boundary overlap (for bridge-infill-only experiments)")
     parser.add_argument("--label-source", default="feature", help="node label for matching/pruning/feature-index: 'feature'=per-feature-vector hash, 'class'=real class label data.y, 'feature_bucket_K'=MD5(feature tuple) modulo K")
     parser.add_argument("--generate-query-cache-only", action="store_true")
+    parser.add_argument(
+        "--evaluation-query-types",
+        default="",
+        help=(
+            "Optional query-family subset to evaluate after loading the cache. "
+            "The cache is still generated and validated from --query-types, so a "
+            "canonical all-family cache can drive a targeted rerun without changing "
+            "query identities."
+        ),
+    )
     parser.add_argument("--max-eval-queries", type=int, default=0)
     parser.add_argument("--query-workers", type=int, default=1)
     parser.add_argument("--partial-every", type=int, default=25)
@@ -2209,6 +2289,29 @@ def main():
     if args.generate_query_cache_only:
         print(f"Query cache ready for {len(queries)} queries.", flush=True)
         return
+    if args.evaluation_query_types:
+        selected_types = set(_expanded_query_types(args.evaluation_query_types))
+        unknown_types = selected_types - set(_expanded_query_types(args.query_types))
+        if unknown_types:
+            raise ValueError(
+                "--evaluation-query-types must be a subset of --query-types; "
+                f"unknown={sorted(unknown_types)}"
+            )
+        original = len(queries)
+        queries = [
+            item for item in queries if str(item.get("query_type", "")) in selected_types
+        ]
+        expected = args.queries * len(parse_budgets(args.target_sizes)) * len(selected_types)
+        if len(queries) != expected:
+            raise ValueError(
+                "Filtered query count does not match the canonical workload: "
+                f"got={len(queries)} expected={expected} types={sorted(selected_types)}"
+            )
+        print(
+            f"[EVALUATION SUBSET] Using {len(queries)}/{original} cached queries "
+            f"for types={sorted(selected_types)}.",
+            flush=True,
+        )
     if args.max_eval_queries and args.max_eval_queries > 0:
         original = len(queries)
         queries = queries[: args.max_eval_queries]

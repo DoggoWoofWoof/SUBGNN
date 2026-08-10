@@ -266,7 +266,25 @@ def make_figure(summary_rows, dataset, out_path):
         print(f"[WARN] matplotlib unavailable, skipping figure: {exc}", file=sys.stderr)
         return
 
-    method_order = ["filterall", "neural", "mean_rrf", "mean_feature", "topo", "topo_feature", "random"]
+    method_order = [
+        "hybrid", "coarse_mean_rrf", "mean_feature", "topo_feature", "random", "all",
+    ]
+    display_names = {
+        "hybrid": "Jigsaw",
+        "coarse_mean_rrf": "Mean-RRF",
+        "mean_feature": "MeanFeat",
+        "topo_feature": "TopoFeat",
+        "random": "Random",
+        "all": "FilterAll",
+    }
+    colors = {
+        "hybrid": "#1f77b4",
+        "coarse_mean_rrf": "#2ca02c",
+        "mean_feature": "#9467bd",
+        "topo_feature": "#8c564b",
+        "random": "#7f7f7f",
+        "all": "#d62728",
+    }
     rows.sort(key=lambda r: (method_order.index(r["method"]) if r["method"] in method_order else 99, r["method"]))
     stage_labels = ["overlap", "signature", "pruned", "component"]
 
@@ -274,7 +292,15 @@ def make_figure(summary_rows, dataset, out_path):
     x = range(len(stage_labels))
     for r in rows:
         ys = [max(r[f"p50_{s}_nodes"], 1.0) for s in stage_labels]
-        ax.plot(list(x), ys, marker="o", label=f"{r['method']} (solve {r['solve_rate']*100:.0f}%)")
+        method = r["method"]
+        label = display_names.get(method, method.replace("_", " ").title())
+        ax.plot(
+            list(x),
+            ys,
+            marker="o",
+            color=colors.get(method),
+            label=f"{label} (solve {r['solve_rate']*100:.0f}%)",
+        )
     ax.set_yscale("log")
     ax.set_xticks(list(x))
     ax.set_xticklabels(["overlap", "signature", "label-pruned", "solver\ncomponents"])
@@ -282,7 +308,7 @@ def make_figure(summary_rows, dataset, out_path):
     full = rows[0].get("p50_overlap_nodes", 0)
     ax.set_title(f"{dataset.upper()} candidate-shrinkage cascade (median nodes per query)")
     ax.grid(True, which="both", axis="y", alpha=0.3)
-    ax.legend(fontsize=8, loc="upper right")
+    ax.legend(fontsize=8, loc="lower left", ncol=2, framealpha=0.96)
     fig.tight_layout()
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150)

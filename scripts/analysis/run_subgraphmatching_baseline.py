@@ -281,6 +281,10 @@ def main() -> None:
     labels = labels_for_source(data, args.label_source)
     data.node_label = labels
     label_counts = torch.bincount(labels.detach().cpu().view(-1).long())
+    class_venue_base = None
+    if args.label_source == "class" and hasattr(data, "y") and data.y is not None:
+        y = data.y.detach().cpu().view(-1).long()
+        class_venue_base = int(y[y >= 0].max().item()) + 1 if bool((y >= 0).any()) else 1
 
     hierarchy_path = args.hierarchy_path or cascade.default_hierarchy_path(args.dataset)
     cache_key = cascade.safe_cache_key(
@@ -313,8 +317,15 @@ def main() -> None:
     max_runs = int(args.max_runs or 0)
     run_count = 0
     for query_index, item in enumerate(queries):
-        q_labels = labels[item["query_nodes"].long()]
         query = item["query"]
+        q_labels = torch.tensor(
+            cascade.derive_query_labels(
+                query,
+                args.label_source,
+                class_venue_base=class_venue_base,
+            ),
+            dtype=torch.long,
+        )
         query.node_label = q_labels
         q_label_counts = label_counts[q_labels.long()].detach().cpu().long()
         label_consistent = bool(torch.equal(q_labels.cpu().long(), labels[item["query_nodes"].long()].cpu().long()))
@@ -344,6 +355,7 @@ def main() -> None:
                 "target_query_size": item["target_query_size"],
                 "expected_match": bool(item.get("expected_match", True)),
                 "query_nodes": q_meta["nodes"],
+                "query_pruning_source": "query_payload_v1",
                 "query_edges": q_meta["edges"],
                 "target_nodes": target_meta["nodes"],
                 "target_edges": target_meta["edges"],

@@ -15,9 +15,17 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parents[1] / "paper"
+MATCHED_COSTS = (
+    Path(__file__).resolve().parents[1]
+    / "benchmarks"
+    / "paper_results"
+    / "final_results"
+    / "production_matched_costs.csv"
+)
 
 METHODS = ["Jigsaw", "Mean-RRF", "MeanFeat", "TopoFeat", "Random", "FilterAll"]
 COLORS = {
@@ -31,14 +39,12 @@ COLORS = {
 
 # Production matrix: pos-rate (%), avg candidate nodes (K)
 POS = {
-    "Cora":  {"Jigsaw": 94.2, "Mean-RRF": 93.8, "MeanFeat": 88.8, "TopoFeat": 33.4, "Random": 31.3, "FilterAll": 100.0},
-    "Arxiv": {"Jigsaw": 92.8, "Mean-RRF": 94.0, "MeanFeat": 88.9, "TopoFeat": 33.2, "Random": 37.7, "FilterAll": 100.0},
+    "Cora":  {"Jigsaw": 94.2, "Mean-RRF": 93.8, "MeanFeat": 87.7, "TopoFeat": 31.9, "Random": 32.7, "FilterAll": 100.0},
+    "Arxiv": {"Jigsaw": 92.8, "Mean-RRF": 94.0, "MeanFeat": 89.7, "TopoFeat": 33.3, "Random": 39.2, "FilterAll": 100.0},
     "MAG":   {"Jigsaw": 88.6, "Mean-RRF": 85.4, "MeanFeat": 64.6, "TopoFeat": 37.1, "Random": 51.4, "FilterAll": 98.4},
 }
 CAND_K = {
-    "Cora":  {"Jigsaw": 2.5, "Mean-RRF": 2.4, "MeanFeat": 3.5, "TopoFeat": 9.5, "Random": 9.6, "FilterAll": 0.8},
-    "Arxiv": {"Jigsaw": 0.2, "Mean-RRF": 0.2, "MeanFeat": 0.2, "TopoFeat": 0.3, "Random": 0.3, "FilterAll": 0.1},
-    "MAG":   {"Jigsaw": 138.1, "Mean-RRF": 137.1, "MeanFeat": 212.1, "TopoFeat": 235.6, "Random": 282.1, "FilterAll": 443.8},
+    "MAG": {"Jigsaw": 138.1, "Mean-RRF": 137.1, "MeanFeat": 212.1, "TopoFeat": 235.6, "Random": 282.1, "FilterAll": 443.8},
 }
 
 # Cumulative solved-by-budget (paper Sec. results): dataset -> (budgets, values)
@@ -53,11 +59,21 @@ FAMILIES = ["Single", "K-hop", "Deg-K", "Walk", "Multi-fine", "Multi-coarse", "N
 FAMILY_RATES = {
     "Cora":  [100.0, 98.3, 97.3, 75.3, 100.0, 94.3, 100.0, 100.0],
     "Arxiv": [100.0, 97.3, 98.3, 82.3, 100.0, 78.7, 100.0, 100.0],
-    "MAG":   [98.7, 93.3, 92.7, 71.0, 100.0, 76.0, 100.0, 99.7],
+    "MAG":   [98.7, 93.3, 92.7, 71.0, 100.0, 76.0, 100.0, 99.0],
 }
 
 
 def production_positive_rates():
+    matched = pd.read_csv(MATCHED_COSTS)
+    for dataset in ("Cora", "Arxiv"):
+        rows = matched.loc[matched["dataset"].eq(dataset)].set_index("method")
+        if set(rows.index) != set(METHODS):
+            raise ValueError(f"Incomplete matched production costs for {dataset}")
+        POS[dataset] = rows["positive_solve_rate_percent"].to_dict()
+        CAND_K[dataset] = (
+            rows["avg_pruned_candidate_nodes"].div(1000.0).to_dict()
+        )
+
     fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.4))
     datasets = ["Cora", "Arxiv", "MAG"]
     x = np.arange(len(datasets))
@@ -65,17 +81,26 @@ def production_positive_rates():
     for i, m in enumerate(METHODS):
         offs = (i - 2.5) * width
         axes[0].bar(x + offs, [POS[d][m] for d in datasets], width, label=m, color=COLORS[m])
-        axes[1].bar(x + offs, [CAND_K[d][m] for d in datasets], width, label=m, color=COLORS[m])
+    for i, m in enumerate(METHODS):
+        offs = (i - 2.5) * width
+        axes[1].bar(
+            x + offs,
+            [CAND_K[d][m] for d in datasets],
+            width,
+            color=COLORS[m],
+        )
     axes[0].set_ylim(0, 112)
     axes[0].set_ylabel("Positive exact-solve rate (%)")
     axes[0].set_title("Positive exact-solve rate")
     axes[1].set_yscale("log")
     axes[1].set_ylim(0.03, 800)
     axes[1].set_ylabel("Average candidate nodes (K, log)")
-    axes[1].set_title("Verifier candidate domain")
+    axes[1].set_title("Matched verifier domain")
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(datasets)
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(datasets)
     for ax in axes:
-        ax.set_xticks(x)
-        ax.set_xticklabels(datasets)
         ax.spines[["top", "right"]].set_visible(False)
         ax.grid(axis="y", alpha=0.3)
     handles, labels = axes[0].get_legend_handles_labels()
@@ -125,19 +150,22 @@ def family_heatmap():
 
 
 def mag_tradeoff():
-    fig, ax = plt.subplots(figsize=(9.6, 6.2))
-    for m in METHODS:
-        x = CAND_K["MAG"][m]
-        y = POS["MAG"][m]
-        ax.scatter([x], [y], s=220, color=COLORS[m], edgecolor="black", zorder=3)
-        dx, dy = 10, 0
+    fig, ax = plt.subplots(figsize=(11.0, 7.0))
+    # FeatureIndex is a MAG-only classical label-coverage policy (not in the shared METHODS set)
+    pts = [(m, CAND_K["MAG"][m], POS["MAG"][m], COLORS[m]) for m in METHODS]
+    pts.append(("FeatureIndex", 59.4, 96.7, "#17becf"))
+    for m, x, y, c in pts:
+        ax.scatter([x], [y], s=300, color=c, edgecolor="black", zorder=3)
+        dx, dy = 9, 0.6
         if m == "Mean-RRF":
-            dy = -4.5
-        ax.annotate(m, (x, y), xytext=(x + dx, y + dy), fontsize=12)
-    ax.set_xlim(120, 480)
-    ax.set_ylim(25, 105)
-    ax.set_xlabel("Average candidate nodes (thousands)")
-    ax.set_ylabel("Positive exact-solve rate (%)")
+            dy = -4.8
+        if m == "FeatureIndex":
+            dx, dy = 10, 1.2
+        ax.annotate(m, (x, y), xytext=(x + dx, y + dy), fontsize=13)
+    ax.set_xlim(30, 490)
+    ax.set_ylim(25, 108)
+    ax.set_xlabel("Average candidate nodes (thousands)", fontsize=12)
+    ax.set_ylabel("Positive exact-solve rate (%)", fontsize=12)
     ax.grid(alpha=0.3)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()

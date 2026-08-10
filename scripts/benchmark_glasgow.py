@@ -489,6 +489,10 @@ def extract_subgraph(adj_t, node_indices, original_data):
     for attr in ("node_types", "node_offset", "edge_types", "feature_schema", "num_edge_types"):
         if hasattr(original_data, attr):
             setattr(sub, attr, getattr(original_data, attr))
+    for attr in ("node_type", "y", "node_label"):
+        value = getattr(original_data, attr, None)
+        if isinstance(value, torch.Tensor) and int(value.size(0)) == int(original_data.num_nodes):
+            setattr(sub, attr, value[node_indices].detach().cpu())
     return sub
 
 

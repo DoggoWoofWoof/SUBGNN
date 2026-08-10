@@ -86,3 +86,10 @@ rewrite_tex.py
 # Data and cache
 cache/
 data/
+
+# Model checkpoints anywhere under models/ (large; LFS/Modal, not git)
+models/**/*.pth
+models/_unpushed_lfs_backup/
+
+# LaTeX bibliography build artifacts
+paper/*.brf

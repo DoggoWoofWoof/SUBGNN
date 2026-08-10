@@ -298,29 +298,30 @@ def fullcov_ablation_figure():
 
 
 def design_ablation_figure():
-    labels = ["Full\nJigsaw", "No\noverlap", "No\nsignature", "No\ncomponents", "No exact\nlabel"]
-    candidate_k = np.array([0.2, 0.2, 46.9, 0.2, 0.4])
-    solver_ms = np.array([10.1, 7.4, 10.4, 48.0, 60.6])
+    labels = ["Full", "No\noverlap", "No\nsignature", "No\ncomponents", "No\nexact-label"]
+    mag_solve = np.array([88.9, 44.4, 88.9, 63.9, 52.8])
+    arxiv_candidates = np.array([76, 88, 2815, 76, 244])
     x = np.arange(len(labels))
-    fig, ax1 = plt.subplots(figsize=(7.3, 3.8))
-    bars = ax1.bar(x - 0.17, candidate_k, 0.34, color="#1f77b4", label="Candidate nodes (K)")
-    ax1.set_ylabel("Candidate nodes (K)")
-    ax1.set_yscale("symlog", linthresh=1)
-    ax1.set_ylim(0, 70)
-    ax1.grid(axis="y", alpha=0.22)
-    ax2 = ax1.twinx()
-    ax2.plot(x + 0.17, solver_ms, marker="o", linewidth=2.0, color="#d62728", label="Solver time (ms)")
-    ax2.set_ylabel("Solver time (ms)")
-    ax2.set_ylim(0, 70)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(labels)
-    for rect, value in zip(bars, candidate_k):
-        ax1.text(rect.get_x() + rect.get_width() / 2, max(value, 0.2) * 1.18, f"{value:.1f}", ha="center", fontsize=7.3)
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, frameon=False, loc="upper left")
-    ax1.spines["top"].set_visible(False)
-    ax2.spines["top"].set_visible(False)
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.2))
+    axes[0].bar(x, mag_solve, color=["#1f77b4", "#d62728", "#1f77b4", "#ff7f0e", "#ff7f0e"])
+    axes[0].set_title("MAG at K=1,000/2,000: overlap is the lever\n(positive solve rate, n=36)")
+    axes[0].set_ylabel("Positive solve rate (%)")
+    axes[0].set_ylim(0, 105)
+    for i, value in enumerate(mag_solve):
+        axes[0].text(i, value + 1.5, f"{value:.1f}", ha="center", fontsize=9)
+
+    axes[1].bar(x, arxiv_candidates, color=["#1f77b4", "#1f77b4", "#d62728", "#1f77b4", "#ff7f0e"])
+    axes[1].set_yscale("log")
+    axes[1].set_title("Arxiv at K=100/200: signature is the lever\n(mean pruned candidate nodes, n=36; log)")
+    axes[1].set_ylabel("Mean pruned candidate nodes")
+    axes[1].set_ylim(50, 20000)
+    for i, value in enumerate(arxiv_candidates):
+        axes[1].text(i, value * 1.15, f"{value:,.0f}", ha="center", fontsize=9)
+    for axis in axes:
+        axis.set_xticks(x)
+        axis.set_xticklabels(labels, fontsize=8.5)
+        axis.spines[["top", "right"]].set_visible(False)
+        axis.grid(axis="y", alpha=0.3)
     savefig("fig_design_ablation.png")
 
 
@@ -474,18 +475,15 @@ def budget_curves(df: pd.DataFrame):
 
 
 def main() -> None:
-    df = load_summary_for_figures()
-    totals = method_totals(df)
+    # This legacy script still reads the superseded combined summary. Keep it
+    # only for structural illustrations; canonical result figures are generated
+    # by generate_paper_figures_v2.py, generate_scaling_figure.py, and
+    # generate_ablation_pareto_figures.py.
     pipeline_figure()
     architecture_figure()
     fullcov_ablation_figure()
-    production_bar_figure(totals)
-    mag_tradeoff_figure(totals)
-    query_family_heatmap(df)
     partition_overlap_figure()
-    budget_curves(df)
-    design_ablation_figure()
-    print("generated paper figures")
+    print("generated structural figures; canonical result figures are protected")
 
 
 if __name__ == "__main__":
